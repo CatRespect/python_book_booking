@@ -151,3 +151,24 @@ use cases are testable with fakes. Two honest trade-offs to know about:
 - ISBNs are matched exactly (`978-0-13...` and `9780134...` are different). Normalising hyphens is easy to add.
 - No pagination, no authentication (unchanged).
 - Suggested: `import-linter` in CI to enforce the layer rules automatically.
+
+
+## Additional CI fixes (Ruff / mypy)
+
+- Removed redundant `pass` statements from exception classes.
+- Moved each Django model's `Meta` class before magic methods, following DJ012.
+- Gave the API reader payload an explicit `dict[str, object]` type.
+- Replaced the `**object` booking-input merge in unit tests with explicit typed
+  keyword parameters and narrowed optional repository results before accessing fields.
+- Limited mypy's `import-untyped` suppression to Django imports only; project and test
+  code type errors remain enabled. Django's type stubs are not bundled in the project.
+
+
+## Follow-up CI fixes (Ruff / mypy round 3)
+
+- Removed the shebang from `src/manage.py`. Run it as `python src/manage.py`; this avoids
+  relying on executable permissions being preserved by ZIP extraction.
+- Added explicit Python value types to Django model fields (`str`, `int`, `date`, and related
+  model classes), so mypy does not need third-party Django stubs to infer model attributes.
+- Added a typed test-client response protocol and explicit JSON object/list casts in API tests.
+- Annotated migration operations as `list[Operation]` to match Django's migration base class.

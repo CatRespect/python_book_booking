@@ -98,15 +98,20 @@ def test_reader_roundtrip_and_duplicate_email(repos: Repos) -> None:
         use_cases.create_reader(readers, data)
 
 
-def _booking_input(**kw: object) -> CreateBookingInput:
+def _booking_input(
+    *,
+    book_id: int = 1,
+    reader_id: int = 1,
+    start_date: date = date(2026, 1, 1),
+    end_date: date = date(2026, 1, 5),
+) -> CreateBookingInput:
     """Build booking input for a use-case test."""
-    base = {
-        "book_id": 1,
-        "reader_id": 1,
-        "start_date": date(2026, 1, 1),
-        "end_date": date(2026, 1, 5),
-    }
-    return CreateBookingInput(**{**base, **kw})
+    return CreateBookingInput(
+        book_id=book_id,
+        reader_id=reader_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
 
 
 def test_create_booking_happy_path(repos: Repos) -> None:
@@ -155,7 +160,9 @@ def test_booking_takes_a_copy_and_fails_at_zero(repos: Repos) -> None:
     books, readers, bookings, uow = repos
     _setup(repos, total=1)
     use_cases.create_booking(bookings, books, readers, uow, _booking_input())
-    assert books.get(1).copies_available == 0
+    book = books.get(1)
+    assert book is not None
+    assert book.copies_available == 0
     with pytest.raises(NoCopiesAvailableError):
         use_cases.create_booking(bookings, books, readers, uow, _booking_input())
     assert len(bookings.items) == 1
@@ -192,8 +199,12 @@ def test_cancel_returns_copy_and_is_idempotent(repos: Repos) -> None:
     use_cases.create_booking(bookings, books, readers, uow, _booking_input())
     use_cases.remove_booking(bookings, books, uow, 1)
     use_cases.remove_booking(bookings, books, uow, 1)
-    assert books.get(1).copies_available == 1
-    assert bookings.get(1).status == BookingStatus.CANCELLED
+    book = books.get(1)
+    booking = bookings.get(1)
+    assert book is not None
+    assert booking is not None
+    assert book.copies_available == 1
+    assert booking.status == BookingStatus.CANCELLED
 
 
 def test_move_booking_to_other_book_moves_the_copy(repos: Repos) -> None:
@@ -207,7 +218,11 @@ def test_move_booking_to_other_book_moves_the_copy(repos: Repos) -> None:
     use_cases.update_booking(
         bookings, books, readers, uow, 1, UpdateBookingInput(book_id=2)
     )
-    assert (books.get(1).copies_available, books.get(2).copies_available) == (1, 0)
+    first_book = books.get(1)
+    second_book = books.get(2)
+    assert first_book is not None
+    assert second_book is not None
+    assert (first_book.copies_available, second_book.copies_available) == (1, 0)
 
 
 def test_update_and_delete_rules(repos: Repos) -> None:

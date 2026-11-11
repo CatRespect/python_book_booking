@@ -8,25 +8,17 @@ The presentation layer maps each *category* to a status code
 class DomainError(Exception):
     """Represent a base error raised by domain operations."""
 
-    pass
-
 
 class NotFoundError(DomainError):
     """Represent a domain error for a missing entity."""
-
-    pass
 
 
 class ConflictError(DomainError):
     """Represent a domain error for a conflicting operation."""
 
-    pass
-
 
 class InvalidInputError(DomainError):
     """Represent a domain error for invalid input."""
-
-    pass
 
 
 class BookNotFoundError(NotFoundError):

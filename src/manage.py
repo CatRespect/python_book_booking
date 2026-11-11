@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Command-line entry point for Django management commands."""
 
 import os
