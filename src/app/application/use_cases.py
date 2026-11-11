@@ -30,16 +30,16 @@ from app.domain.entities import (
     Reader,
 )
 from app.domain.exceptions import (
-    BookAlreadyExists,
-    BookHasBookings,
-    BookingNotActive,
-    BookingNotFound,
-    BookNotFound,
-    InvalidBookingPeriod,
-    InvalidEmail,
-    IsbnBelongsToAnotherBook,
-    ReaderHasBookings,
-    ReaderNotFound,
+    BookAlreadyExistsError,
+    BookHasBookingsError,
+    BookingNotActiveError,
+    BookingNotFoundError,
+    BookNotFoundError,
+    InvalidBookingPeriodError,
+    InvalidEmailError,
+    IsbnBelongsToAnotherBookError,
+    ReaderHasBookingsError,
+    ReaderNotFoundError,
 )
 from app.domain.repositories import (
     BookingRepository,
@@ -51,21 +51,24 @@ from app.domain.validators import is_valid_email, normalize_email
 
 
 def _checked_email(raw: str) -> str:
+    """Normalize and validate an email address."""
     email = normalize_email(raw)
     if not is_valid_email(email):
-        raise InvalidEmail(raw)
+        raise InvalidEmailError(raw)
     return email
 
 
 # ---------------------------------------------------------------- books
 def list_books(books: BookRepository) -> list[Book]:
+    """List all books."""
     return books.list()
 
 
 def get_book(books: BookRepository, book_id: int) -> Book:
+    """Get a book by its identifier."""
     book = books.get(book_id)
     if book is None:
-        raise BookNotFound(book_id)
+        raise BookNotFoundError(book_id)
     return book
 
 
@@ -74,10 +77,9 @@ def create_book(
 ) -> CreateBookOutput:
     """Add a new title, or add copies to an existing one.
 
-    * ISBN unknown                         -> new book, all copies available (created=True)
-    * ISBN known, same title and author    -> copies_total and copies_available both grow
-                                              by data.copies_total (created=False)
-    * ISBN known, different title/author   -> IsbnBelongsToAnotherBook (409)
+    * Unknown ISBN: create a book with all copies available (``created=True``).
+    * Matching ISBN, title, and author: add the requested copies (``created=False``).
+    * ISBN known, different title/author   -> IsbnBelongsToAnotherBookError (409)
     """
     with uow.atomic():
         existing = books.get_by_isbn(data.isbn)
@@ -91,7 +93,7 @@ def create_book(
                     copies_available=data.copies_total,
                 )
                 return CreateBookOutput(book=books.add(new), created=True)
-            except BookAlreadyExists:
+            except BookAlreadyExistsError:
                 # Another request created this ISBN between our lookup and our insert.
                 existing = books.get_by_isbn(data.isbn)
                 if existing is None:  # pragma: no cover - vanished again: report as is
@@ -100,9 +102,9 @@ def create_book(
         # each other, then re-check against the locked (fresh) values.
         locked = books.get_for_update(existing.id)
         if locked is None:  # pragma: no cover - deleted in between
-            raise BookNotFound(existing.id)
+            raise BookNotFoundError(existing.id)
         if not locked.is_same_edition(data.title, data.author):
-            raise IsbnBelongsToAnotherBook(data.isbn)
+            raise IsbnBelongsToAnotherBookError(data.isbn)
         updated = books.save(locked.with_copies_added(data.copies_total))
         return CreateBookOutput(book=updated, created=False)
 
@@ -110,43 +112,48 @@ def create_book(
 def update_book(
     books: BookRepository, uow: UnitOfWork, book_id: int, data: UpdateBookInput
 ) -> Book:
+    """Update a book and its stock information."""
     changes = data.model_dump(exclude_none=True)  # null in a PATCH means "not sent"
     with uow.atomic():
         book = books.get_for_update(book_id)
         if book is None:
-            raise BookNotFound(book_id)
+            raise BookNotFoundError(book_id)
         new_total = changes.pop("copies_total", None)
         if new_total is not None:
-            book = book.with_total_copies(new_total)  # may raise CopiesInUse
+            book = book.with_total_copies(new_total)  # may raise CopiesInUseError
         book = book.model_copy(update=changes)
-        return books.save(book)  # may raise BookAlreadyExists (ISBN taken)
+        return books.save(book)  # may raise BookAlreadyExistsError (ISBN taken)
 
 
 def remove_book(
     books: BookRepository, bookings: BookingRepository, uow: UnitOfWork, book_id: int
 ) -> None:
+    """Remove a book that has no booking history."""
     with uow.atomic():
         if books.get_for_update(book_id) is None:
-            raise BookNotFound(book_id)
+            raise BookNotFoundError(book_id)
         # Bookings (even cancelled ones) are history that points at the book.
         if bookings.exists_for_book(book_id):
-            raise BookHasBookings(book_id)
+            raise BookHasBookingsError(book_id)
         books.delete(book_id)
 
 
 # -------------------------------------------------------------- readers
 def list_readers(readers: ReaderRepository) -> list[Reader]:
+    """List all readers."""
     return readers.list()
 
 
 def get_reader(readers: ReaderRepository, reader_id: int) -> ReaderNameOutput:
+    """Get a reader by its identifier."""
     reader = readers.get(reader_id)
     if reader is None:
-        raise ReaderNotFound(reader_id)
+        raise ReaderNotFoundError(reader_id)
     return ReaderNameOutput(full_name=reader.full_name)
 
 
 def create_reader(readers: ReaderRepository, data: CreateReaderInput) -> Reader:
+    """Create a reader after validating the email address."""
     email = _checked_email(data.email)
     return readers.add(NewReader(full_name=data.full_name, email=email))
 
@@ -154,34 +161,38 @@ def create_reader(readers: ReaderRepository, data: CreateReaderInput) -> Reader:
 def update_reader(
     readers: ReaderRepository, reader_id: int, data: UpdateReaderInput
 ) -> Reader:
+    """Update a reader and validate a changed email address."""
     changes = data.model_dump(exclude_none=True)
     if "email" in changes:
         changes["email"] = _checked_email(changes["email"])
     reader = readers.get(reader_id)
     if reader is None:
-        raise ReaderNotFound(reader_id)
+        raise ReaderNotFoundError(reader_id)
     return readers.save(reader.model_copy(update=changes))
 
 
 def remove_reader(
     readers: ReaderRepository, bookings: BookingRepository, reader_id: int
 ) -> None:
+    """Remove a reader who has no bookings."""
     if readers.get(reader_id) is None:
-        raise ReaderNotFound(reader_id)
+        raise ReaderNotFoundError(reader_id)
     if bookings.exists_for_reader(reader_id):
-        raise ReaderHasBookings(reader_id)
+        raise ReaderHasBookingsError(reader_id)
     readers.delete(reader_id)
 
 
 # ------------------------------------------------------------- bookings
 def list_bookings(bookings: BookingRepository) -> list[Booking]:
+    """List all bookings."""
     return bookings.list()
 
 
 def get_booking(bookings: BookingRepository, booking_id: int) -> BookingDetailsOutput:
+    """Get a booking by its identifier."""
     booking = bookings.get(booking_id)
     if booking is None:
-        raise BookingNotFound(booking_id)
+        raise BookingNotFoundError(booking_id)
     return BookingDetailsOutput(**booking.model_dump(exclude={"id"}))
 
 
@@ -192,16 +203,19 @@ def create_booking(
     uow: UnitOfWork,
     data: CreateBookingInput,
 ) -> Booking:
-    """Book one copy: checks the rules, takes a copy, stores the booking - atomically."""
+    """Reserve one copy atomically.
+
+    Validate the booking, reserve a copy, and store the booking.
+    """
     if data.end_date < data.start_date:
-        raise InvalidBookingPeriod
+        raise InvalidBookingPeriodError
     with uow.atomic():
         book = books.get_for_update(data.book_id)
         if book is None:
-            raise BookNotFound(data.book_id)
+            raise BookNotFoundError(data.book_id)
         if readers.get(data.reader_id) is None:
-            raise ReaderNotFound(data.reader_id)
-        books.save(book.with_copy_taken())  # raises NoCopiesAvailable at 0
+            raise ReaderNotFoundError(data.reader_id)
+        books.save(book.with_copy_taken())  # raises NoCopiesAvailableError at 0
         return bookings.add(NewBooking(**data.model_dump()))
 
 
@@ -222,18 +236,18 @@ def update_booking(
     with uow.atomic():
         booking = bookings.get_for_update(booking_id)
         if booking is None:
-            raise BookingNotFound(booking_id)
+            raise BookingNotFoundError(booking_id)
         if booking.status != BookingStatus.ACTIVE:
-            raise BookingNotActive(booking_id, booking.status.value)
+            raise BookingNotActiveError(booking_id, booking.status.value)
 
         updated = booking.model_copy(update=changes)
         if updated.end_date < updated.start_date:
-            raise InvalidBookingPeriod
+            raise InvalidBookingPeriodError
         if (
             updated.reader_id != booking.reader_id
             and readers.get(updated.reader_id) is None
         ):
-            raise ReaderNotFound(updated.reader_id)
+            raise ReaderNotFoundError(updated.reader_id)
 
         if updated.book_id != booking.book_id:
             _move_copy(books, old_id=booking.book_id, new_id=updated.book_id)
@@ -243,15 +257,16 @@ def update_booking(
 def _move_copy(books: BookRepository, old_id: int, new_id: int) -> None:
     # Lock in ascending id order: two requests moving bookings in opposite
     # directions between the same two books would otherwise deadlock.
+    """Move the reserved copy between books."""
     locked: dict[int, Book | None] = {
         i: books.get_for_update(i) for i in sorted({old_id, new_id})
     }
     old, new = locked[old_id], locked[new_id]
     if new is None:
-        raise BookNotFound(new_id)
+        raise BookNotFoundError(new_id)
     if old is None:  # pragma: no cover - FK PROTECT makes this impossible
-        raise BookNotFound(old_id)
-    taken = new.with_copy_taken()  # raises NoCopiesAvailable
+        raise BookNotFoundError(old_id)
+    taken = new.with_copy_taken()  # raises NoCopiesAvailableError
     books.save(taken)
     books.save(old.with_copy_returned())
 
@@ -262,7 +277,7 @@ def remove_booking(
     uow: UnitOfWork,
     booking_id: int,
 ) -> None:
-    """Soft delete: the booking becomes CANCELLED and its copy becomes available again.
+    """Cancel a booking and make its reserved copy available again.
 
     DELETE is idempotent: cancelling an already cancelled booking does nothing.
     A RETURNED booking is history and cannot be cancelled.
@@ -270,11 +285,11 @@ def remove_booking(
     with uow.atomic():
         booking = bookings.get_for_update(booking_id)
         if booking is None:
-            raise BookingNotFound(booking_id)
+            raise BookingNotFoundError(booking_id)
         if booking.status == BookingStatus.CANCELLED:
             return
         if booking.status != BookingStatus.ACTIVE:
-            raise BookingNotActive(booking_id, booking.status.value)
+            raise BookingNotActiveError(booking_id, booking.status.value)
         book = books.get_for_update(booking.book_id)
         if book is not None:
             books.save(book.with_copy_returned())

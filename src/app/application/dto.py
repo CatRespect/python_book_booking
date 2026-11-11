@@ -1,3 +1,5 @@
+"""Data transfer objects for application use cases."""
+
 from datetime import date
 from typing import Annotated
 
@@ -37,16 +39,22 @@ class CreateBookInput(BaseModel):
 
 
 class CreateBookOutput(BaseModel):
+    """Return the created book and whether it was newly registered."""
+
     book: Book
     created: bool  # False => the ISBN existed and copies were added to it
 
 
 class CreateReaderInput(BaseModel):
+    """Receive the name and email address of a new reader."""
+
     full_name: FullName
     email: Email
 
 
 class CreateBookingInput(BaseModel):
+    """Receive the book, reader, and dates for a new booking."""
+
     book_id: int
     reader_id: int
     start_date: date
@@ -67,11 +75,15 @@ class UpdateBookInput(BaseModel):
 
 
 class UpdateReaderInput(BaseModel):
+    """Receive the optional fields to update for a reader."""
+
     full_name: FullName | None = None
     email: Email | None = None
 
 
 class UpdateBookingInput(BaseModel):
+    """Receive the optional fields to update for a booking."""
+
     book_id: int | None = None
     reader_id: int | None = None
     start_date: date | None = None
@@ -79,10 +91,14 @@ class UpdateBookingInput(BaseModel):
 
 
 class ReaderNameOutput(BaseModel):
+    """Return the public name of a reader."""
+
     full_name: str
 
 
 class BookingDetailsOutput(BaseModel):
+    """Return the public details of a booking."""
+
     book_id: int
     reader_id: int
     start_date: date

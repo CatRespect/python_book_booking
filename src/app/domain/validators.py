@@ -6,9 +6,9 @@ import re
 #   local part : letters, digits and the usual specials, dots only BETWEEN characters
 #   domain     : dot-separated labels (letters, digits, inner hyphens), at least one dot
 #   TLD        : letters only, 2+ characters
-# It is stricter than the naive "*@*.*": it rejects "a@.com", "a@b.", "a@b..c", "a b@c.de".
-# Labels are written so that there is only one way to match them, which keeps the
-# regex linear-time (no catastrophic backtracking on hostile input).
+# It is stricter than the naive "*@*.*": it rejects malformed local and domain parts.
+# Labels are written so that there is only one way to match them. This keeps the
+# regex linear-time and avoids catastrophic backtracking on hostile input.
 _LOCAL = r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*"
 _LABEL = r"[A-Za-z0-9]+(?:-+[A-Za-z0-9]+)*"
 EMAIL_RE = re.compile(rf"{_LOCAL}@(?:{_LABEL}\.)+[A-Za-z]{{2,}}")

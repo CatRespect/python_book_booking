@@ -1,3 +1,5 @@
+"""Django settings for the book booking service."""
+
 import os
 from pathlib import Path
 

@@ -1,3 +1,5 @@
+"""URL configuration for the book booking API."""
+
 from django.urls import path
 
 from app.presentation.api import api

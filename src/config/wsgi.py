@@ -1,3 +1,5 @@
+"""WSGI entry point for the book booking service."""
+
 import os
 
 from django.core.wsgi import get_wsgi_application

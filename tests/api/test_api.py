@@ -1,12 +1,17 @@
-"""API tests. Implemented endpoints hit the real PostgreSQL test database (make db-up first)."""
+"""Exercise API endpoints against the PostgreSQL test database."""
 
 import json
+from http import HTTPStatus
 
 import pytest
+from django.http import HttpResponse
 from django.test import Client
 
 client = Client()
 JSON = "application/json"
+INITIAL_COPIES = 3
+RESTOCKED_COPIES = 5
+COPIES_AVAILABLE_AFTER_UPDATE = 4
 
 BOOK = {
     "title": "Clean Architecture",
@@ -17,25 +22,29 @@ BOOK = {
 READER = {"full_name": "Jane Doe", "email": "jane@example.com"}
 
 
-def post(url, body):
+def post(url: str, body: dict[str, object]) -> HttpResponse:
+    """Send a JSON POST request to the API."""
     return client.post(url, json.dumps(body), content_type=JSON)
 
 
-def make_book(**over):
+def make_book(**over: object) -> dict[str, object]:
+    """Create a book through the API test client."""
     return post("/api/books", {**BOOK, **over}).json()
 
 
-def make_reader(**over):
+def make_reader(**over: object) -> dict[str, object]:
+    """Create a reader through the API test client."""
     return post("/api/readers", {**READER, **over}).json()
 
 
 # ---------------------------------------------------------------- books
 @pytest.mark.django_db
 def test_create_and_get_book() -> None:
+    """Test create and get book."""
     r = post("/api/books", BOOK)
-    assert r.status_code == 201
+    assert r.status_code == HTTPStatus.CREATED
     created = r.json()
-    assert created["copies_available"] == 3
+    assert created["copies_available"] == INITIAL_COPIES
     assert created["id"]
     assert client.get(f"/api/books/{created['id']}").json() == created
     assert client.get("/api/books").json() == [created]
@@ -43,19 +52,25 @@ def test_create_and_get_book() -> None:
 
 @pytest.mark.django_db
 def test_book_errors() -> None:
+    """Test book errors."""
     make_book()
     assert (
-        post("/api/books", {**BOOK, "title": "Other"}).status_code == 409
+        post("/api/books", {**BOOK, "title": "Other"}).status_code
+        == HTTPStatus.CONFLICT
     )  # ISBN, other title
-    assert client.get("/api/books/999999").status_code == 404
-    assert post("/api/books", {**BOOK, "copies_total": 0}).status_code == 422
+    assert client.get("/api/books/999999").status_code == HTTPStatus.NOT_FOUND
+    assert (
+        post("/api/books", {**BOOK, "copies_total": 0}).status_code
+        == HTTPStatus.UNPROCESSABLE_ENTITY
+    )
 
 
 # -------------------------------------------------------------- readers
 @pytest.mark.django_db
 def test_create_and_get_reader() -> None:
+    """Test create and get reader."""
     created = post("/api/readers", READER)
-    assert created.status_code == 201
+    assert created.status_code == HTTPStatus.CREATED
     rid = created.json()["id"]
     assert client.get(f"/api/readers/{rid}").json() == {"full_name": "Jane Doe"}
     assert len(client.get("/api/readers").json()) == 1
@@ -63,14 +78,18 @@ def test_create_and_get_reader() -> None:
 
 @pytest.mark.django_db
 def test_reader_errors() -> None:
+    """Test reader errors."""
     make_reader()
-    assert post("/api/readers", READER).status_code == 409  # duplicate email
-    assert client.get("/api/readers/999999").status_code == 404
+    assert (
+        post("/api/readers", READER).status_code == HTTPStatus.CONFLICT
+    )  # duplicate email
+    assert client.get("/api/readers/999999").status_code == HTTPStatus.NOT_FOUND
 
 
 # ------------------------------------------------------------- bookings
 @pytest.mark.django_db
 def test_create_and_get_booking() -> None:
+    """Test create and get booking."""
     book, reader = make_book(), make_reader()
     body = {
         "book_id": book["id"],
@@ -79,7 +98,7 @@ def test_create_and_get_booking() -> None:
         "end_date": "2026-01-14",
     }
     r = post("/api/bookings", body)
-    assert r.status_code == 201
+    assert r.status_code == HTTPStatus.CREATED
     assert r.json()["status"] == "active"
     got = client.get(f"/api/bookings/{r.json()['id']}").json()
     assert got == {**body, "status": "active"}
@@ -88,6 +107,7 @@ def test_create_and_get_booking() -> None:
 
 @pytest.mark.django_db
 def test_booking_errors() -> None:
+    """Test booking errors."""
     book, reader = make_book(), make_reader()
     ok = {
         "book_id": book["id"],
@@ -95,14 +115,26 @@ def test_booking_errors() -> None:
         "start_date": "2026-01-01",
         "end_date": "2026-01-14",
     }
-    assert post("/api/bookings", {**ok, "end_date": "2025-12-31"}).status_code == 400
-    assert post("/api/bookings", {**ok, "book_id": 999999}).status_code == 404
-    assert post("/api/bookings", {**ok, "reader_id": 999999}).status_code == 404
-    assert client.get("/api/bookings/999999").status_code == 404
+    assert (
+        post("/api/bookings", {**ok, "end_date": "2025-12-31"}).status_code
+        == HTTPStatus.BAD_REQUEST
+    )
+    assert (
+        post("/api/bookings", {**ok, "book_id": 999999}).status_code
+        == HTTPStatus.NOT_FOUND
+    )
+    assert (
+        post("/api/bookings", {**ok, "reader_id": 999999}).status_code
+        == HTTPStatus.NOT_FOUND
+    )
+    assert client.get("/api/bookings/999999").status_code == HTTPStatus.NOT_FOUND
 
 
 # ------------------------------------------- copies / update / delete
-def booking_body(book, reader):
+def booking_body(
+    book: dict[str, object], reader: dict[str, object]
+) -> dict[str, object]:
+    """Build the request body for a booking."""
     return {
         "book_id": book["id"],
         "reader_id": reader["id"],
@@ -111,62 +143,92 @@ def booking_body(book, reader):
     }
 
 
-def patch(url, body):
+def patch(url: str, body: dict[str, object]) -> HttpResponse:
+    """Send a JSON PATCH request to the API."""
     return client.patch(url, json.dumps(body), content_type=JSON)
 
 
 @pytest.mark.django_db
 def test_booking_decrements_and_cancel_restores_copies() -> None:
+    """Test booking decrements and cancel restores copies."""
     book, reader = make_book(copies_total=1), make_reader()
     r = post("/api/bookings", booking_body(book, reader))
     assert client.get(f"/api/books/{book['id']}").json()["copies_available"] == 0
-    assert post("/api/bookings", booking_body(book, reader)).status_code == 409
-    assert client.delete(f"/api/bookings/{r.json()['id']}").status_code == 204
+    assert (
+        post("/api/bookings", booking_body(book, reader)).status_code
+        == HTTPStatus.CONFLICT
+    )
+    assert (
+        client.delete(f"/api/bookings/{r.json()['id']}").status_code
+        == HTTPStatus.NO_CONTENT
+    )
     assert client.get(f"/api/books/{book['id']}").json()["copies_available"] == 1
     assert client.get(f"/api/bookings/{r.json()['id']}").json()["status"] == "cancelled"
 
 
 @pytest.mark.django_db
 def test_adding_same_book_adds_copies() -> None:
+    """Test adding same book adds copies."""
     first = post("/api/books", BOOK)
     again = post("/api/books", {**BOOK, "copies_total": 2})
-    assert (first.status_code, again.status_code) == (201, 200)
-    assert again.json()["copies_total"] == 5
-    assert again.json()["copies_available"] == 5
-    assert post("/api/books", {**BOOK, "title": "Other"}).status_code == 409
+    assert (first.status_code, again.status_code) == (HTTPStatus.CREATED, HTTPStatus.OK)
+    assert again.json()["copies_total"] == RESTOCKED_COPIES
+    assert again.json()["copies_available"] == RESTOCKED_COPIES
+    assert (
+        post("/api/books", {**BOOK, "title": "Other"}).status_code
+        == HTTPStatus.CONFLICT
+    )
 
 
 @pytest.mark.django_db
 def test_book_update_and_delete() -> None:
+    """Test book update and delete."""
     book = make_book()
     other = make_book(isbn="222")
     url = f"/api/books/{book['id']}"
     assert patch(url, {"title": "New"}).json()["title"] == "New"
-    assert patch(url, {"isbn": "222"}).status_code == 409
-    assert patch("/api/books/999999", {"title": "x"}).status_code == 404
+    assert patch(url, {"isbn": "222"}).status_code == HTTPStatus.CONFLICT
+    assert (
+        patch("/api/books/999999", {"title": "x"}).status_code == HTTPStatus.NOT_FOUND
+    )
     reader = make_reader()
     post("/api/bookings", booking_body(book, reader))
-    assert patch(url, {"copies_total": 5}).json()["copies_available"] == 4
-    assert client.delete(url).status_code == 409  # has bookings
-    assert client.delete(f"/api/books/{other['id']}").status_code == 204
-    assert client.delete(f"/api/books/{other['id']}").status_code == 404
+    assert (
+        patch(url, {"copies_total": 5}).json()["copies_available"]
+        == COPIES_AVAILABLE_AFTER_UPDATE
+    )
+    assert client.delete(url).status_code == HTTPStatus.CONFLICT  # has bookings
+    assert (
+        client.delete(f"/api/books/{other['id']}").status_code == HTTPStatus.NO_CONTENT
+    )
+    assert (
+        client.delete(f"/api/books/{other['id']}").status_code == HTTPStatus.NOT_FOUND
+    )
 
 
 @pytest.mark.django_db
 def test_reader_email_validation_update_and_delete() -> None:
-    assert post("/api/readers", {**READER, "email": "not-an-email"}).status_code == 400
-    assert post("/api/readers", {**READER, "email": "a@b"}).status_code == 400
+    """Test reader email validation update and delete."""
+    assert (
+        post("/api/readers", {**READER, "email": "not-an-email"}).status_code
+        == HTTPStatus.BAD_REQUEST
+    )
+    assert (
+        post("/api/readers", {**READER, "email": "a@b"}).status_code
+        == HTTPStatus.BAD_REQUEST
+    )
     reader = make_reader(email="Jane@Example.com")
     assert reader["email"] == "jane@example.com"
     url = f"/api/readers/{reader['id']}"
-    assert patch(url, {"email": "bad"}).status_code == 400
+    assert patch(url, {"email": "bad"}).status_code == HTTPStatus.BAD_REQUEST
     assert patch(url, {"full_name": "Jane Q"}).json()["full_name"] == "Jane Q"
-    assert client.delete(url).status_code == 204
-    assert client.delete(url).status_code == 404
+    assert client.delete(url).status_code == HTTPStatus.NO_CONTENT
+    assert client.delete(url).status_code == HTTPStatus.NOT_FOUND
 
 
 @pytest.mark.django_db
 def test_booking_update_moves_copy_and_delete_rules() -> None:
+    """Test booking update moves copy and delete rules."""
     b1, b2, reader = (
         make_book(copies_total=1),
         make_book(isbn="222", copies_total=1),
@@ -174,19 +236,31 @@ def test_booking_update_moves_copy_and_delete_rules() -> None:
     )
     bid = post("/api/bookings", booking_body(b1, reader)).json()["id"]
     r = patch(f"/api/bookings/{bid}", {"book_id": b2["id"], "end_date": "2026-02-01"})
-    assert r.status_code == 200
+    assert r.status_code == HTTPStatus.OK
     assert r.json()["book_id"] == b2["id"]
     assert client.get(f"/api/books/{b1['id']}").json()["copies_available"] == 1
     assert client.get(f"/api/books/{b2['id']}").json()["copies_available"] == 0
-    assert patch(f"/api/bookings/{bid}", {"end_date": "2025-01-01"}).status_code == 400
-    assert patch("/api/bookings/999999", {"end_date": "2026-02-01"}).status_code == 404
+    assert (
+        patch(f"/api/bookings/{bid}", {"end_date": "2025-01-01"}).status_code
+        == HTTPStatus.BAD_REQUEST
+    )
+    assert (
+        patch("/api/bookings/999999", {"end_date": "2026-02-01"}).status_code
+        == HTTPStatus.NOT_FOUND
+    )
     client.delete(f"/api/bookings/{bid}")
-    assert patch(f"/api/bookings/{bid}", {"end_date": "2026-03-01"}).status_code == 409
-    assert client.delete(f"/api/readers/{reader['id']}").status_code == 409
+    assert (
+        patch(f"/api/bookings/{bid}", {"end_date": "2026-03-01"}).status_code
+        == HTTPStatus.CONFLICT
+    )
+    assert (
+        client.delete(f"/api/readers/{reader['id']}").status_code == HTTPStatus.CONFLICT
+    )
 
 
 def test_openapi_and_docs() -> None:
+    """Test openapi and docs."""
     schema = client.get("/api/openapi.json").json()
     assert "delete" in schema["paths"]["/api/bookings/{booking_id}"]
     assert "404" in schema["paths"]["/api/books/{book_id}"]["get"]["responses"]
-    assert client.get("/api/docs").status_code == 200
+    assert client.get("/api/docs").status_code == HTTPStatus.OK

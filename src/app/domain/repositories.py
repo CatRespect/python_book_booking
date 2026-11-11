@@ -14,83 +14,117 @@ class UnitOfWork(ABC):
     """
 
     @abstractmethod
-    def atomic(self) -> AbstractContextManager[None]: ...
+    def atomic(self) -> AbstractContextManager[None]:
+        """Open a unit-of-work transaction."""
+        ...
 
 
 class BookRepository(ABC):
-    @abstractmethod
-    def list(self) -> list[Book]: ...
+    """Define storage operations for books."""
 
     @abstractmethod
-    def get(self, book_id: int) -> Book | None: ...
+    def list(self) -> list[Book]:
+        """List all records in the repository."""
+        ...
 
     @abstractmethod
-    def get_by_isbn(self, isbn: str) -> Book | None: ...
+    def get(self, book_id: int) -> Book | None:
+        """Get a record by its identifier."""
+        ...
+
+    @abstractmethod
+    def get_by_isbn(self, isbn: str) -> Book | None:
+        """Get a book by its ISBN."""
+        ...
 
     @abstractmethod
     def get_for_update(self, book_id: int) -> Book | None:
-        """Like get(), but locks the row until the surrounding transaction ends.
+        """Get and lock a book until the surrounding transaction ends.
 
-        Must be called inside ``UnitOfWork.atomic()``. This is what makes
-        "read copies_available, then change it" safe under concurrent requests.
+        Call this inside ``UnitOfWork.atomic()`` to protect concurrent copy updates.
         """
 
     @abstractmethod
     def add(self, new_book: NewBook) -> Book:
-        """Store and return the book. Raises BookAlreadyExists on duplicate ISBN."""
+        """Store and return the book.
+
+        Raise BookAlreadyExistsError on a duplicate ISBN.
+        """
 
     @abstractmethod
     def save(self, book: Book) -> Book:
         """Persist every field of an existing book.
 
-        Raises BookNotFound if it vanished, BookAlreadyExists on duplicate ISBN.
+        Raise BookNotFoundError if the book vanished, or BookAlreadyExistsError
+        if the ISBN is duplicated.
         """
 
     @abstractmethod
     def delete(self, book_id: int) -> None:
-        """Raises BookNotFound, or BookHasBookings if bookings still reference it."""
+        """Raise the relevant error if the book is missing or has bookings."""
 
 
 class ReaderRepository(ABC):
-    @abstractmethod
-    def list(self) -> list[Reader]: ...
+    """Define storage operations for readers."""
 
     @abstractmethod
-    def get(self, reader_id: int) -> Reader | None: ...
+    def list(self) -> list[Reader]:
+        """List all records in the repository."""
+        ...
+
+    @abstractmethod
+    def get(self, reader_id: int) -> Reader | None:
+        """Get a record by its identifier."""
+        ...
 
     @abstractmethod
     def add(self, new_reader: NewReader) -> Reader:
-        """Store and return the reader. Raises ReaderAlreadyExists on duplicate email."""
+        """Store and return the reader.
+
+        Raise ReaderAlreadyExistsError on a duplicate email.
+        """
 
     @abstractmethod
     def save(self, reader: Reader) -> Reader:
-        """Raises ReaderNotFound, or ReaderAlreadyExists on duplicate email."""
+        """Raise an error if the reader is missing or the email is already used."""
 
     @abstractmethod
     def delete(self, reader_id: int) -> None:
-        """Raises ReaderNotFound, or ReaderHasBookings if bookings still reference it."""
+        """Raise an error if the reader is missing or still has bookings."""
 
 
 class BookingRepository(ABC):
-    @abstractmethod
-    def list(self) -> list[Booking]: ...
+    """Define storage operations for bookings."""
 
     @abstractmethod
-    def get(self, booking_id: int) -> Booking | None: ...
+    def list(self) -> list[Booking]:
+        """List all records in the repository."""
+        ...
+
+    @abstractmethod
+    def get(self, booking_id: int) -> Booking | None:
+        """Get a record by its identifier."""
+        ...
 
     @abstractmethod
     def get_for_update(self, booking_id: int) -> Booking | None:
-        """get() + row lock; call inside ``UnitOfWork.atomic()``."""
+        """Get and lock a booking inside ``UnitOfWork.atomic()``."""
 
     @abstractmethod
-    def add(self, new_booking: NewBooking) -> Booking: ...
+    def add(self, new_booking: NewBooking) -> Booking:
+        """Add a new record to the repository."""
+        ...
 
     @abstractmethod
     def save(self, booking: Booking) -> Booking:
-        """Raises BookingNotFound if the booking vanished."""
+        """Raise BookingNotFoundError if the booking no longer exists."""
 
     @abstractmethod
-    def exists_for_book(self, book_id: int) -> bool: ...
+    def exists_for_book(self, book_id: int) -> bool:
+        """Check whether a booking exists for the book."""
+        ...
 
     @abstractmethod
-    def exists_for_reader(self, reader_id: int) -> bool: ...
+    def exists_for_reader(self, reader_id: int) -> bool:
+        """Check whether a booking exists for the reader."""
+        ...

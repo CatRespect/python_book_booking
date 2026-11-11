@@ -1,3 +1,6 @@
+"""Basic project smoke tests."""
+
+
 class TestExample:
     """Пример классов тестов."""
 
