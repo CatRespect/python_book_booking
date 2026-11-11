@@ -4,8 +4,17 @@ Later: accept repositories (from app.domain.repositories) and implement the real
 """
 from datetime import date
 
-from app.application.dto import CreateBookingInput, CreateBookInput, CreateReaderInput
-from app.domain.entities import Book, Booking, BookingStatus, Reader
+from app.application.dto import (
+    BookingDetailsOutput,
+    CreateBookingInput,
+    CreateBookInput,
+    CreateReaderInput,
+    ReaderNameOutput,
+    UpdateBookingInput,
+    UpdateBookInput,
+    UpdateReaderInput,
+)
+from app.domain.entities import Book, Booking, Reader
 
 _SAMPLE_BOOK = Book(
     id=1,
@@ -41,19 +50,50 @@ def list_readers() -> list[Reader]:
     return [_SAMPLE_READER]
 
 
+def get_reader(reader_id: int) -> ReaderNameOutput:
+    return ReaderNameOutput(full_name=_SAMPLE_READER.full_name)
+
+
 def create_reader(data: CreateReaderInput) -> Reader:
     return Reader(id=1, **data.model_dump())
+
+
+def update_reader(reader_id: int, data: UpdateReaderInput) -> Reader:
+    changes = data.model_dump(exclude_unset=True)
+    return _SAMPLE_READER.model_copy(update={"id": reader_id, **changes})
+
+
+def remove_reader(reader_id: int) -> None:
+    return None
 
 
 def list_bookings() -> list[Booking]:
     return [_SAMPLE_BOOKING]
 
 
+def get_booking(booking_id: int) -> BookingDetailsOutput:
+    return BookingDetailsOutput(**_SAMPLE_BOOKING.model_dump(exclude={"id"}))
+
+
 def create_booking(data: CreateBookingInput) -> Booking:
     return Booking(id=1, **data.model_dump())
 
 
-def cancel_booking(booking_id: int) -> Booking:
-    return _SAMPLE_BOOKING.model_copy(
-        update={"id": booking_id, "status": BookingStatus.CANCELLED}
-    )
+
+def update_book(book_id: int, data: UpdateBookInput) -> Book:
+    changes = data.model_dump(exclude_unset=True)
+    return _SAMPLE_BOOK.model_copy(update={"id": book_id, **changes})
+
+
+def remove_book(book_id: int) -> None:
+    return None
+
+
+def update_booking(booking_id: int, data: UpdateBookingInput) -> Booking:
+    changes = data.model_dump(exclude_unset=True)
+    return _SAMPLE_BOOKING.model_copy(update={"id": booking_id, **changes})
+
+
+def remove_booking(booking_id: int) -> None:
+    """Soft delete: later this should set status=CANCELLED instead of erasing the row."""
+    return None

@@ -92,6 +92,69 @@
         "tags": [
           "Books"
         ]
+      },
+      "patch": {
+        "operationId": "app_presentation_api_patch_book",
+        "summary": "Update a book",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "schema": {
+              "title": "Book Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Books"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookInput"
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "delete": {
+        "operationId": "app_presentation_api_delete_book",
+        "summary": "Remove a book",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "schema": {
+              "title": "Book Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "Books"
+        ]
       }
     },
     "/api/readers": {
@@ -150,6 +213,101 @@
         }
       }
     },
+    "/api/readers/{reader_id}": {
+      "get": {
+        "operationId": "app_presentation_api_get_reader",
+        "summary": "Get a reader's name",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reader_id",
+            "schema": {
+              "title": "Reader Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReaderNameOutput"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Readers"
+        ]
+      },
+      "patch": {
+        "operationId": "app_presentation_api_patch_reader",
+        "summary": "Update a reader",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reader_id",
+            "schema": {
+              "title": "Reader Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reader"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Readers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReaderInput"
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "delete": {
+        "operationId": "app_presentation_api_delete_reader",
+        "summary": "Remove a reader",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "reader_id",
+            "schema": {
+              "title": "Reader Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        },
+        "tags": [
+          "Readers"
+        ]
+      }
+    },
     "/api/bookings": {
       "get": {
         "operationId": "app_presentation_api_get_bookings",
@@ -206,10 +364,40 @@
         }
       }
     },
-    "/api/bookings/{booking_id}/cancel": {
-      "post": {
-        "operationId": "app_presentation_api_cancel_booking",
-        "summary": "Cancel a booking",
+    "/api/bookings/{booking_id}": {
+      "get": {
+        "operationId": "app_presentation_api_get_booking",
+        "summary": "Get a booking",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "booking_id",
+            "schema": {
+              "title": "Booking Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingDetailsOutput"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Bookings"
+        ]
+      },
+      "patch": {
+        "operationId": "app_presentation_api_patch_booking",
+        "summary": "Update a booking",
         "parameters": [
           {
             "in": "path",
@@ -231,6 +419,39 @@
                 }
               }
             }
+          }
+        },
+        "tags": [
+          "Bookings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookingInput"
+              }
+            }
+          },
+          "required": true
+        }
+      },
+      "delete": {
+        "operationId": "app_presentation_api_delete_booking",
+        "summary": "Remove (cancel) a booking",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "booking_id",
+            "schema": {
+              "title": "Booking Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
           }
         },
         "tags": [
@@ -310,6 +531,58 @@
         "title": "CreateBookInput",
         "type": "object"
       },
+      "UpdateBookInput": {
+        "description": "All fields optional: PATCH only changes what the client sends.",
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "isbn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isbn"
+          },
+          "copies_total": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Copies Total"
+          }
+        },
+        "title": "UpdateBookInput",
+        "type": "object"
+      },
       "Reader": {
         "properties": {
           "id": {
@@ -349,6 +622,47 @@
           "email"
         ],
         "title": "CreateReaderInput",
+        "type": "object"
+      },
+      "ReaderNameOutput": {
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "full_name"
+        ],
+        "title": "ReaderNameOutput",
+        "type": "object"
+      },
+      "UpdateReaderInput": {
+        "properties": {
+          "full_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Full Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          }
+        },
+        "title": "UpdateReaderInput",
         "type": "object"
       },
       "Booking": {
@@ -431,6 +745,92 @@
           "end_date"
         ],
         "title": "CreateBookingInput",
+        "type": "object"
+      },
+      "BookingDetailsOutput": {
+        "properties": {
+          "book_id": {
+            "title": "Book Id",
+            "type": "integer"
+          },
+          "reader_id": {
+            "title": "Reader Id",
+            "type": "integer"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          }
+        },
+        "required": [
+          "book_id",
+          "reader_id",
+          "start_date",
+          "end_date",
+          "status"
+        ],
+        "title": "BookingDetailsOutput",
+        "type": "object"
+      },
+      "UpdateBookingInput": {
+        "properties": {
+          "book_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Book Id"
+          },
+          "reader_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reader Id"
+          },
+          "start_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Date"
+          },
+          "end_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Date"
+          }
+        },
+        "title": "UpdateBookingInput",
         "type": "object"
       }
     }
