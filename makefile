@@ -1,4 +1,4 @@
-.PHONY: check lint format
+.PHONY: check lint format db-up db-down migrations migrate run swagger test
 
 # Run ruff check and fix automatically
 lint:

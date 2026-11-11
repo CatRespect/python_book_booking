@@ -19,8 +19,27 @@ jobs:
   tests:
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_DB: book_booking
+      POSTGRES_USER: book_user
+      POSTGRES_PASSWORD: change_me
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: 5432
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: book_booking
+          POSTGRES_USER: book_user
+          POSTGRES_PASSWORD: change_me
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U book_user -d book_booking"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - uses: actions/checkout@v4 # Checkout the repository
 
@@ -45,4 +64,5 @@ jobs:
 
       - name: Test with pytest
         run: |
+          mkdir -p junit
           poetry run pytest tests --doctest-modules --junitxml=junit/test-results.xml --cov=src --cov-report=xml --cov-report=html
