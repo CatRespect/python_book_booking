@@ -86,7 +86,10 @@ def test_reader_roundtrip_and_duplicate_email(repos) -> None:
 
 def _booking_input(**kw):
     base = {
-        "book_id": 1, "reader_id": 1, "start_date": date(2026, 1, 1), "end_date": date(2026, 1, 5)
+        "book_id": 1,
+        "reader_id": 1,
+        "start_date": date(2026, 1, 1),
+        "end_date": date(2026, 1, 5),
     }
     return CreateBookingInput(**{**base, **kw})
 
