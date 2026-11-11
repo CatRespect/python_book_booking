@@ -1,0 +1,77 @@
+[project]
+name = "hw2"
+version = "0.1.0"
+description = "Template for HW2."
+authors = [
+    {name = "Herman Tarasau",email = "quarriedstone@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+]
+
+[tool.poetry]
+packages = [{include = "hw2", from = "src"}]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 88
+indent-width = 4
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "A005",  # Checks for modules that use the same names as Python standard-library modules.
+    "B008",  # Checks for function calls in default function arguments.
+    "COM812",  # Checks for the absence of trailing commas.
+    "D100",  # Checks for undocumented public module definitions.
+    "D104",  # Checks for undocumented public package definitions.
+    "D105",  # Checks for undocumented magic method definitions.
+    "D107",  # Checks for public __init__ method definitions that are missing docstrings.
+    "D203",  # Checks for docstrings on class definitions that are not preceded by a blank line.
+    "D213",  # Checks for docstring summary lines that are not positioned on the second physical line of the docstring.
+    "G004",  # Checks for uses of f-strings to format logging messages.
+    "ISC001",  # Checks for implicitly concatenated strings on a single line.
+    "RUF001",  # Checks for ambiguous Unicode characters in strings.
+    "RUF002",  # Checks for ambiguous Unicode characters in docstrings.
+    "RUF003",  # Checks for ambiguous Unicode characters in comments.
+    "T201",  # Print statements
+    "S311",  # Random choice allowed
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = [
+    "F401",  # Checks for unused imports.
+]
+"tests/**.py" = [
+    "S101",  # Checks for uses of the assert keyword.
+    "SLF001",  # Checks for accesses on "private" class members.
+    "FBT001",  # Checks for the use of boolean positional arguments in function definitions, as determined by the presence of a bool type hint.
+]
+"functional_tests/**.py" = [
+    "S101",  # Checks for uses of the assert keyword.
+]
+"migrations/**.py" = [
+    "D103",  # Checks for undocumented public function definitions.
+]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+
+[tool.ruff.lint.pylint]
+max-args = 7
+
+[tool.mypy]
+exclude = "venv/"
+[dependency-groups]
+dev = [
+    "pytest (>=8.4.2,<9.0.0)",
+    "pytest-cov (>=7.0.0,<8.0.0)",
+    "ruff (>=0.14.1,<0.15.0)",
+    "mypy (>=1.18.2,<2.0.0)",
+    "black (>=25.9.0,<26.0.0)",
+]
