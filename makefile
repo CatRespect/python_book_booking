@@ -8,3 +8,18 @@ lint:
 # Run ruff format
 format:
 	black .
+
+db-up:
+	docker compose up -d db
+
+db-down:
+	docker compose down
+
+run:
+	python src/manage.py runserver
+
+swagger:
+	python src/manage.py export_openapi_schema --api app.presentation.api.api --output swagger.json --indent 2
+
+test:
+	pytest

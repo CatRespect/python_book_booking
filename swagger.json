@@ -1,0 +1,439 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Book Booking API",
+    "version": "0.1.0",
+    "description": "Prototype: endpoints return stub data, no business logic yet."
+  },
+  "paths": {
+    "/api/books": {
+      "get": {
+        "operationId": "app_presentation_api_get_books",
+        "summary": "List books",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Book"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Books"
+        ]
+      },
+      "post": {
+        "operationId": "app_presentation_api_post_book",
+        "summary": "Create a book",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Books"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookInput"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/books/{book_id}": {
+      "get": {
+        "operationId": "app_presentation_api_get_book",
+        "summary": "Get a book",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "schema": {
+              "title": "Book Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Books"
+        ]
+      }
+    },
+    "/api/readers": {
+      "get": {
+        "operationId": "app_presentation_api_get_readers",
+        "summary": "List readers",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Reader"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Readers"
+        ]
+      },
+      "post": {
+        "operationId": "app_presentation_api_post_reader",
+        "summary": "Create a reader",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Reader"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Readers"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReaderInput"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/bookings": {
+      "get": {
+        "operationId": "app_presentation_api_get_bookings",
+        "summary": "List bookings",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Booking"
+                  },
+                  "title": "Response",
+                  "type": "array"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Bookings"
+        ]
+      },
+      "post": {
+        "operationId": "app_presentation_api_post_booking",
+        "summary": "Create a booking",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Bookings"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingInput"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/bookings/{booking_id}/cancel": {
+      "post": {
+        "operationId": "app_presentation_api_cancel_booking",
+        "summary": "Cancel a booking",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "booking_id",
+            "schema": {
+              "title": "Booking Id",
+              "type": "integer"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Booking"
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Bookings"
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Book": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "isbn": {
+            "title": "Isbn",
+            "type": "string"
+          },
+          "copies_total": {
+            "minimum": 0,
+            "title": "Copies Total",
+            "type": "integer"
+          },
+          "copies_available": {
+            "minimum": 0,
+            "title": "Copies Available",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "author",
+          "isbn",
+          "copies_total",
+          "copies_available"
+        ],
+        "title": "Book",
+        "type": "object"
+      },
+      "CreateBookInput": {
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "isbn": {
+            "title": "Isbn",
+            "type": "string"
+          },
+          "copies_total": {
+            "minimum": 1,
+            "title": "Copies Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "title",
+          "author",
+          "isbn",
+          "copies_total"
+        ],
+        "title": "CreateBookInput",
+        "type": "object"
+      },
+      "Reader": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "full_name",
+          "email"
+        ],
+        "title": "Reader",
+        "type": "object"
+      },
+      "CreateReaderInput": {
+        "properties": {
+          "full_name": {
+            "title": "Full Name",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          }
+        },
+        "required": [
+          "full_name",
+          "email"
+        ],
+        "title": "CreateReaderInput",
+        "type": "object"
+      },
+      "Booking": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "book_id": {
+            "title": "Book Id",
+            "type": "integer"
+          },
+          "reader_id": {
+            "title": "Reader Id",
+            "type": "integer"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "status": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/BookingStatus"
+              }
+            ],
+            "default": "active"
+          }
+        },
+        "required": [
+          "id",
+          "book_id",
+          "reader_id",
+          "start_date",
+          "end_date"
+        ],
+        "title": "Booking",
+        "type": "object"
+      },
+      "BookingStatus": {
+        "enum": [
+          "active",
+          "returned",
+          "cancelled"
+        ],
+        "title": "BookingStatus",
+        "type": "string"
+      },
+      "CreateBookingInput": {
+        "properties": {
+          "book_id": {
+            "title": "Book Id",
+            "type": "integer"
+          },
+          "reader_id": {
+            "title": "Reader Id",
+            "type": "integer"
+          },
+          "start_date": {
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "end_date": {
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "book_id",
+          "reader_id",
+          "start_date",
+          "end_date"
+        ],
+        "title": "CreateBookingInput",
+        "type": "object"
+      }
+    }
+  },
+  "servers": []
+}
