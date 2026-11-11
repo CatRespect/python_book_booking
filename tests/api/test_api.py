@@ -1,4 +1,5 @@
 """API tests. Implemented endpoints hit the real PostgreSQL test database (make db-up first)."""
+
 import json
 
 import pytest
@@ -7,7 +8,12 @@ from django.test import Client
 client = Client()
 JSON = "application/json"
 
-BOOK = {"title": "Clean Architecture", "author": "R. Martin", "isbn": "9780134494166", "copies_total": 3}
+BOOK = {
+    "title": "Clean Architecture",
+    "author": "R. Martin",
+    "isbn": "9780134494166",
+    "copies_total": 3,
+}
 READER = {"full_name": "Jane Doe", "email": "jane@example.com"}
 
 
@@ -37,7 +43,9 @@ def test_create_and_get_book():
 @pytest.mark.django_db
 def test_book_errors():
     make_book()
-    assert post("/api/books", BOOK).status_code == 409            # duplicate ISBN
+    assert (
+        post("/api/books", {**BOOK, "title": "Other"}).status_code == 409
+    )  # ISBN, other title
     assert client.get("/api/books/999999").status_code == 404
     assert post("/api/books", {**BOOK, "copies_total": 0}).status_code == 422
 
@@ -55,7 +63,7 @@ def test_create_and_get_reader():
 @pytest.mark.django_db
 def test_reader_errors():
     make_reader()
-    assert post("/api/readers", READER).status_code == 409        # duplicate email
+    assert post("/api/readers", READER).status_code == 409  # duplicate email
     assert client.get("/api/readers/999999").status_code == 404
 
 
@@ -63,8 +71,12 @@ def test_reader_errors():
 @pytest.mark.django_db
 def test_create_and_get_booking():
     book, reader = make_book(), make_reader()
-    body = {"book_id": book["id"], "reader_id": reader["id"],
-            "start_date": "2026-01-01", "end_date": "2026-01-14"}
+    body = {
+        "book_id": book["id"],
+        "reader_id": reader["id"],
+        "start_date": "2026-01-01",
+        "end_date": "2026-01-14",
+    }
     r = post("/api/bookings", body)
     assert r.status_code == 201 and r.json()["status"] == "active"
     got = client.get(f"/api/bookings/{r.json()['id']}").json()
@@ -75,33 +87,98 @@ def test_create_and_get_booking():
 @pytest.mark.django_db
 def test_booking_errors():
     book, reader = make_book(), make_reader()
-    ok = {"book_id": book["id"], "reader_id": reader["id"],
-          "start_date": "2026-01-01", "end_date": "2026-01-14"}
+    ok = {
+        "book_id": book["id"],
+        "reader_id": reader["id"],
+        "start_date": "2026-01-01",
+        "end_date": "2026-01-14",
+    }
     assert post("/api/bookings", {**ok, "end_date": "2025-12-31"}).status_code == 400
     assert post("/api/bookings", {**ok, "book_id": 999999}).status_code == 404
     assert post("/api/bookings", {**ok, "reader_id": 999999}).status_code == 404
     assert client.get("/api/bookings/999999").status_code == 404
 
 
-# ---------------------------------------- stubs (no database access yet)
-def test_update_and_remove_book_stub():
-    r = client.patch("/api/books/4", json.dumps({"title": "New"}), content_type=JSON)
-    assert r.status_code == 200 and r.json()["title"] == "New"
-    assert client.delete("/api/books/4").status_code == 204
+# ------------------------------------------- copies / update / delete
+def booking_body(book, reader):
+    return {
+        "book_id": book["id"],
+        "reader_id": reader["id"],
+        "start_date": "2026-01-01",
+        "end_date": "2026-01-14",
+    }
 
 
-def test_update_and_remove_reader_stub():
-    r = client.patch("/api/readers/4", json.dumps({"email": "x@y.com"}), content_type=JSON)
-    assert r.status_code == 200 and r.json()["email"] == "x@y.com"
-    assert client.delete("/api/readers/4").status_code == 204
+def patch(url, body):
+    return client.patch(url, json.dumps(body), content_type=JSON)
 
 
-def test_update_and_remove_booking_stub():
-    body = {"book_id": 9, "reader_id": 8, "end_date": "2026-02-01"}
-    r = client.patch("/api/bookings/4", json.dumps(body), content_type=JSON)
-    assert r.status_code == 200
-    assert (r.json()["book_id"], r.json()["reader_id"]) == (9, 8)
-    assert client.delete("/api/bookings/4").status_code == 204
+@pytest.mark.django_db
+def test_booking_decrements_and_cancel_restores_copies():
+    book, reader = make_book(copies_total=1), make_reader()
+    r = post("/api/bookings", booking_body(book, reader))
+    assert client.get(f"/api/books/{book['id']}").json()["copies_available"] == 0
+    assert post("/api/bookings", booking_body(book, reader)).status_code == 409
+    assert client.delete(f"/api/bookings/{r.json()['id']}").status_code == 204
+    assert client.get(f"/api/books/{book['id']}").json()["copies_available"] == 1
+    assert client.get(f"/api/bookings/{r.json()['id']}").json()["status"] == "cancelled"
+
+
+@pytest.mark.django_db
+def test_adding_same_book_adds_copies():
+    first = post("/api/books", BOOK)
+    again = post("/api/books", {**BOOK, "copies_total": 2})
+    assert (first.status_code, again.status_code) == (201, 200)
+    assert again.json()["copies_total"] == 5 and again.json()["copies_available"] == 5
+    assert post("/api/books", {**BOOK, "title": "Other"}).status_code == 409
+
+
+@pytest.mark.django_db
+def test_book_update_and_delete():
+    book = make_book()
+    other = make_book(isbn="222")
+    url = f"/api/books/{book['id']}"
+    assert patch(url, {"title": "New"}).json()["title"] == "New"
+    assert patch(url, {"isbn": "222"}).status_code == 409
+    assert patch("/api/books/999999", {"title": "x"}).status_code == 404
+    reader = make_reader()
+    post("/api/bookings", booking_body(book, reader))
+    assert patch(url, {"copies_total": 5}).json()["copies_available"] == 4
+    assert client.delete(url).status_code == 409  # has bookings
+    assert client.delete(f"/api/books/{other['id']}").status_code == 204
+    assert client.delete(f"/api/books/{other['id']}").status_code == 404
+
+
+@pytest.mark.django_db
+def test_reader_email_validation_update_and_delete():
+    assert post("/api/readers", {**READER, "email": "not-an-email"}).status_code == 400
+    assert post("/api/readers", {**READER, "email": "a@b"}).status_code == 400
+    reader = make_reader(email="Jane@Example.com")
+    assert reader["email"] == "jane@example.com"
+    url = f"/api/readers/{reader['id']}"
+    assert patch(url, {"email": "bad"}).status_code == 400
+    assert patch(url, {"full_name": "Jane Q"}).json()["full_name"] == "Jane Q"
+    assert client.delete(url).status_code == 204
+    assert client.delete(url).status_code == 404
+
+
+@pytest.mark.django_db
+def test_booking_update_moves_copy_and_delete_rules():
+    b1, b2, reader = (
+        make_book(copies_total=1),
+        make_book(isbn="222", copies_total=1),
+        make_reader(),
+    )
+    bid = post("/api/bookings", booking_body(b1, reader)).json()["id"]
+    r = patch(f"/api/bookings/{bid}", {"book_id": b2["id"], "end_date": "2026-02-01"})
+    assert r.status_code == 200 and r.json()["book_id"] == b2["id"]
+    assert client.get(f"/api/books/{b1['id']}").json()["copies_available"] == 1
+    assert client.get(f"/api/books/{b2['id']}").json()["copies_available"] == 0
+    assert patch(f"/api/bookings/{bid}", {"end_date": "2025-01-01"}).status_code == 400
+    assert patch("/api/bookings/999999", {"end_date": "2026-02-01"}).status_code == 404
+    client.delete(f"/api/bookings/{bid}")
+    assert patch(f"/api/bookings/{bid}", {"end_date": "2026-03-01"}).status_code == 409
+    assert client.delete(f"/api/readers/{reader['id']}").status_code == 409
 
 
 def test_openapi_and_docs():

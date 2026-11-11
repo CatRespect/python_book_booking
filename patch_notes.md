@@ -1,151 +1,153 @@
-# Patch notes: database connection + real GET / CREATE (v0.2.0)
+# Patch notes v0.3.0: availability, email validation, full update/delete
 
 ## 1. Summary
 
-The API now stores data in PostgreSQL. **List, get-by-id and create** work for all three
-resources (books, readers, bookings). **PATCH and DELETE are still stubs** returning sample
-data, exactly as before.
+| Requested | Result |
+|---|---|
+| `copies_available` decreases on booking | Done. Atomic, row-locked, 409 when no copy is left |
+| `copies_available` increases when a book with same ISBN + title + author is added | Done. `POST /books` adds copies to the existing book (200 instead of 201) |
+| Email regex check | Done. In the domain layer, returns 400; emails are also trimmed and lower-cased |
+| Remaining update + delete | Done for books, readers, bookings (no stubs left) |
+| Review of the whole code | Section 6 |
 
-| Resource | `GET` list | `GET /{id}` | `POST` | `PATCH /{id}` | `DELETE /{id}` |
-|---|---|---|---|---|---|
-| Books    | real | real (full book) | real | stub | stub |
-| Readers  | real | real (`full_name` only) | real | stub | stub |
-| Bookings | real | real (no `id`) | real | stub | stub |
+Verification: **65 tests pass** (was 18) on PostgreSQL 16, plus a manual concurrency run:
+10 simultaneous bookings of the last copy gave exactly one 201 and nine 409, final
+`copies_available = 0`. The sandbox ran Python 3.12 (your project asks for 3.14), so run
+`make test` once on your machine.
 
-Verified: 17 automated tests pass (7 unit tests with no database, 10 API tests against a real
-PostgreSQL 16), plus a manual run against a live server. The sandbox used a locally installed
-PostgreSQL 16, **not** your Docker container, so run `make db-up` and the tests once on your machine.
+## 2. Behaviour rules (the contract)
 
-## 2. What changed, by layer
+**Books**
+- `POST /books`, ISBN unknown: new book, all copies available -> **201**.
+- `POST /books`, same ISBN **and** same title and author (case and extra spaces ignored): the
+  `copies_total` you send is **added** to both `copies_total` and `copies_available` -> **200**.
+- `POST /books`, same ISBN but different title/author: **409** (probably a typo, not "more copies").
+- `PATCH /books/{id}`: `copies_total` means the **new total stock**. Copies on loan stay on loan, so
+  `copies_available = new_total - on_loan`. Lowering the total below the loaned count -> **409**.
+  A taken ISBN -> **409**.
+- `DELETE /books/{id}`: **409** if any booking (even cancelled) references it, else 204.
 
-### Domain (`src/app/domain/`) - still pure Python
-- **`entities.py`**: each entity is now split in two: `NewBook` / `NewReader` / `NewBooking`
-  (data *before* it is stored, no `id`) and `Book` / `Reader` / `Booking` (extend the New* class
-  with `id`).
-  *Why:* the database assigns ids. Without this split, creating an entity would need a fake id or
-  `id: int | None`, which would leak "maybe no id" into every API response schema.
-- **`exceptions.py`** (new): `BookNotFound`, `ReaderNotFound`, `BookingNotFound`,
-  `BookAlreadyExists`, `ReaderAlreadyExists`, `InvalidBookingPeriod`, grouped under three
-  categories: `NotFoundError`, `ConflictError`, `InvalidInputError`.
-  *Why:* business failures are expressed in business terms; the domain knows nothing about HTTP.
-- **`repositories.py`**: ports updated: `add()` takes a `New*` object and returns the stored
-  entity; `ReaderRepository.get()` added (needed to validate bookings).
+**Readers**
+- Email is trimmed, lower-cased, and must match the pattern below, else **400**. Applies to POST and PATCH.
+- `DELETE /readers/{id}`: **409** if the reader has any booking.
 
-### Application (`src/app/application/use_cases.py`)
-- Implemented `list_*`, `get_*`, `create_*` for the three resources. Each takes the repositories
-  it needs as its **first arguments** (e.g. `get_book(books, book_id)`).
-  *Why:* plain functions with injected ports keep the style of the previous prototype, need no
-  classes, and can be tested with in-memory fakes.
-- `create_book` sets `copies_available = copies_total` (a new title starts fully available).
-- `create_booking` applies three rules in order: `end_date >= start_date`, the book exists, the
-  reader exists.
-- `update_*` / `remove_*` remain stubs in a clearly marked section at the bottom of the file.
+**Bookings**
+- `POST`: takes one copy; **409** when `copies_available` is 0. Nothing is stored on failure.
+- `PATCH`: only **active** bookings (409 otherwise). Dates are re-validated against the merged values (400).
+  Changing `book_id` returns the old copy and takes one from the new book (409 if none).
+- `DELETE`: soft delete. Status becomes `cancelled` and the copy is returned. Repeating it is a
+  no-op (204). Deleting a `returned` booking -> 409.
+- In every PATCH, `null` is treated as "not sent".
 
-### Infrastructure (`src/app/infrastructure/`) - all Django ORM lives here
-- **`models.py`**: `BookModel`, `ReaderModel`, `BookingModel` (tables `books`, `readers`, `bookings`).
-- **`repositories.py`**: `DjangoBookRepository`, `DjangoReaderRepository`,
-  `DjangoBookingRepository` implement the domain ports. ORM rows become domain entities via
-  `Entity.model_validate(row, from_attributes=True)`, so no hand-written mapper layer is needed.
-- **`apps.py`** + **`migrations/0001_initial.py`**: registers the models as the Django app labelled
-  `booking` and creates the schema.
+Email pattern (`domain/validators.py`): `local@label.label.tld`. Local part has letters, digits and
+common specials, with dots only *between* characters. Domain labels are alphanumeric with inner
+hyphens, there must be at least one dot, and the TLD is 2+ letters. Max 254 chars total and 64
+for the local part. It rejects `a@.com`, `a@b.`, `a@b..c`, `a b@c.de`, and `a@b`. It is
+deliberately not full RFC 5322, and non-ASCII domains must be given as punycode.
 
-### Presentation (`src/app/presentation/api.py`)
-- Endpoints call use cases and pass repositories from the container.
-- **Domain error -> HTTP mapping**, done once with exception handlers:
-  `NotFoundError` -> **404**, `ConflictError` -> **409**, `InvalidInputError` -> **400**, all with
-  body `{"detail": "..."}`.
-- Error responses are declared per endpoint, so they appear in Swagger (`ErrorResponse` schema).
-- API version bumped to 0.2.0; stub endpoints are labelled "(stub)" in their summaries.
+## 3. What changed, by layer, and why
 
-### Composition root (`src/config/container.py`, new)
-The only module that knows both the abstract ports and the concrete Django classes. To swap a
-storage implementation (or use fakes), this is the one file to change.
+### Domain (still no Django)
+- **`validators.py` (new)**: the email regex, `normalize_email`, `normalize_text`. *Why here:* an
+  email format is a business rule; it must hold no matter which interface (API, CLI) is used.
+  Labels are written unambiguously, so the regex runs in linear time (tested against hostile input).
+- **`entities.py`**: `Book` gained behaviour: `with_copy_taken()`, `with_copy_returned()`,
+  `with_copies_added()`, `with_total_copies()`, `is_same_edition()`. They return a changed copy
+  instead of mutating. *Why:* the copy-count rules are the heart of the domain, so they live on
+  the entity, not scattered across use cases or the ORM. `NewBook` also checks
+  `available <= total`.
+- **`exceptions.py`**: new `NoCopiesAvailable`, `CopiesInUse`, `IsbnBelongsToAnotherBook`,
+  `BookHasBookings`, `ReaderHasBookings`, `BookingNotActive` (all 409) and `InvalidEmail` (400).
+  They reuse your existing category -> HTTP mapping, so `api.py` needed no new handlers.
+- **`repositories.py` (ports)**: added `get_by_isbn`, `get_for_update`, `save`, `delete`,
+  `exists_for_book/reader`, and a new **`UnitOfWork`** port (`atomic()`). *Why:* your v0.2.0 notes
+  listed a Unit of Work as the next step. Booking now changes two tables (book + booking), and
+  that must be all-or-nothing without the use case knowing about Django transactions.
 
-### Settings (`src/config/settings.py`)
-- Registered `app.infrastructure.apps.InfrastructureConfig` in `INSTALLED_APPS`.
-- Added `CONN_MAX_AGE=60` and `CONN_HEALTH_CHECKS=True` (see decision 6 below).
+### Application
+- **`use_cases.py`**: all stubs replaced. Multi-row operations run inside `uow.atomic()` and lock
+  the rows they read with `get_for_update` (`SELECT ... FOR UPDATE`). *Why:* "read available, then
+  write available-1" is a classic race; without the lock two requests both see 1 copy.
+  When two books are locked at once (moving a booking) they are locked in ascending id order to
+  avoid deadlocks. `create_book` also survives the race where another request inserts the same ISBN
+  between the lookup and the insert.
+- **Signature changes** (your call sites in `api.py` are updated): `create_book(books, uow, data)`
+  now returns `CreateBookOutput(book, created)`; `create_booking(..., uow, data)`; `update_*` and
+  `remove_*` now take repositories first like the rest.
+- **`dto.py`**: titles/authors/ISBN/name are trimmed, non-empty and capped to the column length.
+  *Why:* a 300-char title used to pass validation and crash PostgreSQL with a 500 (now 422).
 
-## 3. Database schema
+### Infrastructure
+- **`repositories.py`**: implementations of the new ports. `DjangoUnitOfWork` wraps
+  `transaction.atomic()`. `delete` maps Django's `ProtectedError` to `BookHasBookings` /
+  `ReaderHasBookings` as a last safety net behind the use-case check.
+- **Bug fix:** previously *any* `IntegrityError` was reported as "ISBN/email already exists".
+  Now only PostgreSQL's unique-violation code (23505) is, so CHECK/FK failures are not disguised.
+- **No migration needed**: the schema already had the `available <= total` check and the ISBN unique.
 
-| Table | Columns | Constraints |
-|---|---|---|
-| `books` | id, title, author, isbn, copies_total, copies_available | `isbn` UNIQUE; `copies_available <= copies_total`; both counts >= 0 |
-| `readers` | id, full_name, email | `email` UNIQUE |
-| `bookings` | id, book_id, reader_id, start_date, end_date, status | FKs to books/readers (`PROTECT`); `end_date >= start_date`; status in active/returned/cancelled |
+### Presentation / config
+- `api.py`: endpoints call the real use cases; each declares its 400/404/409 responses so Swagger is
+  accurate; version 0.3.0. `container.py`: added `unit_of_work()`. `swagger.json` regenerated.
 
-## 4. Key decisions and why
+## 4. Key decisions, and alternatives I rejected
 
-1. **ORM models are separate from domain entities.** Django models describe storage; entities
-   describe the business. Keeping them apart means the domain imports no Django, and the
-   database can change without touching business rules. The cost: a conversion at the repository
-   boundary (one line, see above).
-2. **Repository ports + in-memory fakes.** Use cases only see abstract repositories, so
-   `tests/unit/` exercises all business rules in milliseconds with no database.
-3. **Rules in both the use case and the database.** The use case gives friendly errors (404/400/409).
-   The DB constraints (unique, check, foreign keys) are the safety net against bugs and races.
-4. **Duplicates detected via the unique constraint, not a "check then insert".** Two simultaneous
-   requests could both pass a pre-check; the constraint cannot be raced. The repository catches
-   the resulting `IntegrityError` inside `transaction.atomic()` (a savepoint, so the connection
-   stays usable) and raises `BookAlreadyExists` / `ReaderAlreadyExists`.
-5. **Booking creation checks that the book and the reader exist** and returns a clear 404, instead
-   of letting a foreign-key violation surface as a 500.
-6. **Persistent connections.** `CONN_MAX_AGE=60` avoids opening a new PostgreSQL connection per
-   request; `CONN_HEALTH_CHECKS` discards a connection that died (e.g. after a DB restart) instead
-   of failing the next request.
-7. **Status codes:** business-rule violations on input (e.g. dates reversed) use **400** with
-   `{"detail": str}`. Schema validation errors keep Ninja's own **422** format (`{"detail": [...]}`).
-   The two shapes differ, so clients should handle both.
-8. **Foreign keys use `PROTECT`.** A book or reader with bookings cannot be deleted; this matters
-   when DELETE is implemented.
+1. **Row locks (`select_for_update`) instead of `UPDATE ... WHERE copies_available > 0`.** The
+   single conditional UPDATE is also race-free, but it hides the rule in SQL. With the lock the rule
+   stays in the `Book` entity and is unit-testable without a database.
+2. **Booking cancellation returns the copy**, although you didn't ask. Without it, DELETE would
+   leak copies forever and availability would drift from reality.
+3. **`create_book` merges instead of 409** only when ISBN *and* title *and* author match. If only
+   the ISBN matches I return 409, because silently merging two different books would corrupt data.
+4. **Emails are lower-cased.** This fixes the "uniqueness is case-sensitive" limitation from
+   v0.2.0. Rows created before this patch are not migrated; lower-case them once if you have any.
+5. **Cancelled bookings still block deleting a book/reader.** That matches the existing
+   `on_delete=PROTECT` and keeps history. The alternative (allow deletion when only cancelled bookings
+   exist) would need `SET_NULL`/archiving, which is a bigger design choice.
+6. **Fake unit of work really rolls back** (snapshots the in-memory repos), so unit tests can prove
+   "nothing is stored when a rule fails".
 
-## 5. How to run
+## 5. Tests
 
-```bash
-cp .env.example .env
-make db-up         # PostgreSQL in Docker
-make migrate       # create the tables (first run, and after every pull with new migrations)
-make run           # http://localhost:8000/api/docs
-make test
-make swagger       # refresh swagger.json in the project root
-```
+- `tests/unit/test_validators.py`, `test_entities.py` (new): email cases, copy arithmetic.
+- `tests/unit/test_use_cases.py`: existing tests adapted to the new signatures; new availability,
+  merge, cancel, move and update/delete tests.
+- `tests/api/test_api.py`: the six "stub" tests were replaced by real end-to-end tests.
+- Two old assertions changed on purpose: posting the same ISBN with the same title/author used to
+  be 409 and is now "add copies"; the 409 case now uses a different title.
+- Not covered by automated tests: concurrency (checked manually, see Summary).
 
-Dependencies to add if you haven't: `poetry add django django-ninja "psycopg[binary]"` and
-`poetry add --group dev pytest pytest-django`. Django **5.1 or newer** is required (`CheckConstraint(condition=...)`).
+## 6. Review of the whole code
 
-New root file `pytest.ini` points pytest at the Django settings and adds `src` to the path (it
-replaces the old `tests/conftest.py`). If your `pyproject.toml` already has pytest settings,
-pytest.ini takes precedence; merge as you prefer.
+**Architecture (good):** dependencies point inward (`presentation -> application -> domain <-
+infrastructure`), ORM models are separate from entities, the composition root is one file, and
+use cases are testable with fakes. Two honest trade-offs to know about:
+- The domain imports **pydantic**. Pragmatic and common, but strictly the domain is not
+  framework-free. Fine for learning; plain dataclasses would be the purist version.
+- `api.py` returns domain entities (`Book`, `Booking`, `Reader`) directly as response schemas, so
+  the API contract and the domain model are coupled. Dedicated response DTOs would decouple them.
 
-API tests create a separate `test_<dbname>` database, so the database user needs the CREATEDB
-privilege. The Docker `POSTGRES_USER` is a superuser, so this works out of the box there.
+**Things I found but did NOT change (your files, your call):**
+1. **CI will fail:** there is no PostgreSQL service in `.github/workflows/base.yml`, `pytest-django`
+   is not in the dev dependencies / `poetry.lock` (the tests use `django_db`), and CI never sets up
+   Python 3.14 although `requires-python >= 3.14`. Ruff targets `py312` in `pyproject.toml` but
+   `py311` in CI.
+2. **`docker-compose.yml`** mounts `./docker/postgres/init.sql`, which doesn't exist (Docker will
+   create a directory there and Postgres init can fail or misbehave). Create the file or remove the line.
+3. **`pyproject.toml`**: project name is still `hw2`, and `packages = [{include = "hw2"...}]` points
+   to a package that doesn't exist. `Dockerfile` is empty. `makefile` `.PHONY` lists `check` (no such
+   target) and misses most targets. `Readme.md` still has the "should be a description here" placeholder.
+4. **Dead files:** `presentation/serializers.py`, `views.py`, `urls.py` (empty), `.gitkeep`, and
+   `tests/test_example.py`. Safe to delete.
+5. **Linters:** I ran ruff (pyflakes + import order) and black on the changed code, but **not**
+   your full `select = ["ALL"]` ruff config or mypy (no `django-stubs`), so expect new findings
+   there. Run `make lint` and `make format`.
+6. `ALLOWED_HOSTS = ["*"]` and the default `SECRET_KEY` are fine for development only.
 
-## 6. Tests
+## 7. Known limitations / next steps
 
-- `tests/unit/test_use_cases.py` (7 tests, **no database**): copies default, duplicate ISBN/email,
-  not-found errors, booking rules (bad period, missing book, missing reader).
-- `tests/api/test_api.py` (10 tests): create/get/list round trips on real PostgreSQL, 404/409/400/422
-  paths, stub endpoints, OpenAPI contents.
-- Not covered by automated tests: behaviour under concurrent requests.
-
-## 7. Known limitations (intentionally out of scope for this patch)
-
-- **No availability logic.** Creating a booking does not decrement `copies_available`, and nothing
-  stops more bookings than copies or overlapping bookings of the same copy.
-- **PATCH / DELETE are stubs**: they do not touch the database. `GET /bookings/{id}` therefore
-  reads real data while `PATCH /bookings/{id}` still returns sample data.
-- **No pagination or filtering** on list endpoints; they return every row (ordered by id).
-- **No authentication or authorisation.** `ALLOWED_HOSTS = ["*"]` and the default secret key are
-  development-only settings.
-- **Email format is not validated** (stored as a plain string in the API layer, `EmailField` in the
-  ORM only validates in forms). Email uniqueness is case-sensitive.
-- **Booking creation is not wrapped in one transaction** with its checks; the FK constraints
-  catch the race where a book/reader is deleted in between (would surface as a 500).
-- The migration was generated and applied on PostgreSQL 16 / Django 6.1 in the development sandbox.
-
-## 8. Suggested next steps
-
-1. Implement update/remove (including `remove_booking` as a soft delete -> `status=cancelled`).
-2. Booking rules: availability, overlap detection, decrement/increment `copies_available` inside one
-   transaction (add a Unit of Work port), plus an index on `(book_id, start_date, end_date)`.
-3. Pagination on list endpoints.
-4. Enforce layer boundaries in CI with `import-linter`.
+- There is **no "return a book" operation**: status `returned` exists but nothing sets it. A
+  `POST /bookings/{id}/return` (returns the copy, sets `returned`) is the natural next feature.
+- **Overlapping bookings are not checked**; availability is a simple counter, not date-based.
+- ISBNs are matched exactly (`978-0-13...` and `9780134...` are different). Normalising hyphens is easy to add.
+- No pagination, no authentication (unchanged).
+- Suggested: `import-linter` in CI to enforce the layer rules automatically.

@@ -1,20 +1,49 @@
 from datetime import date
+from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
-from app.domain.entities import BookingStatus
+from app.domain.entities import Book, BookingStatus
+
+# Trimmed, non-empty, and no longer than the database columns (otherwise an over-long
+# value would pass validation and then crash in PostgreSQL with a 500).
+Title = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+]
+Author = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+]
+Isbn = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)
+]
+FullName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)
+]
+# Email *format* is a business rule (domain/validators.py) checked in the use case.
+Email = Annotated[str, StringConstraints(strip_whitespace=True, max_length=254)]
 
 
 class CreateBookInput(BaseModel):
-    title: str
-    author: str
-    isbn: str
+    """Register copies of a book.
+
+    If a book with the same ISBN, title and author already exists, ``copies_total``
+    is the number of copies ADDED to it (and to its available copies).
+    """
+
+    title: Title
+    author: Author
+    isbn: Isbn
     copies_total: int = Field(ge=1)
 
 
+class CreateBookOutput(BaseModel):
+    book: Book
+    created: bool  # False => the ISBN existed and copies were added to it
+
+
 class CreateReaderInput(BaseModel):
-    full_name: str
-    email: str
+    full_name: FullName
+    email: Email
 
 
 class CreateBookingInput(BaseModel):
@@ -25,16 +54,21 @@ class CreateBookingInput(BaseModel):
 
 
 class UpdateBookInput(BaseModel):
-    """All fields optional: PATCH only changes what the client sends."""
-    title: str | None = None
-    author: str | None = None
-    isbn: str | None = None
+    """All fields optional: PATCH only changes what the client sends.
+
+    ``copies_total`` is the NEW total stock (not an increment). Copies currently on
+    loan stay on loan, so ``copies_available`` is recomputed.
+    """
+
+    title: Title | None = None
+    author: Author | None = None
+    isbn: Isbn | None = None
     copies_total: int | None = Field(default=None, ge=1)
 
 
 class UpdateReaderInput(BaseModel):
-    full_name: str | None = None
-    email: str | None = None
+    full_name: FullName | None = None
+    email: Email | None = None
 
 
 class UpdateBookingInput(BaseModel):

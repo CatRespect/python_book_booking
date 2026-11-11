@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Book Booking API",
-    "version": "0.2.0",
-    "description": "List / get / create are backed by PostgreSQL. PATCH and DELETE are still stubs returning sample data."
+    "version": "0.3.0",
+    "description": "Full CRUD backed by PostgreSQL, with copy availability tracking. Booking takes a copy; cancelling returns it; re-adding a book with the same ISBN, title and author adds copies."
   },
   "paths": {
     "/api/books": {
@@ -33,11 +33,21 @@
       },
       "post": {
         "operationId": "app_presentation_api_post_book",
-        "summary": "Create a book",
+        "summary": "Create a book, or add copies to an existing one",
         "parameters": [],
         "responses": {
           "201": {
             "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
@@ -57,6 +67,7 @@
             }
           }
         },
+        "description": "201: a new book was created. 200: a book with the same ISBN, title and author already existed, so `copies_total` copies were added to its total and available counts. 409: the ISBN exists with a different title or author.",
         "tags": [
           "Books"
         ],
@@ -115,7 +126,7 @@
       },
       "patch": {
         "operationId": "app_presentation_api_patch_book",
-        "summary": "Update a book (stub)",
+        "summary": "Update a book",
         "parameters": [
           {
             "in": "path",
@@ -137,8 +148,29 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
+        "description": "`copies_total` is the new total stock; copies on loan are kept, so `copies_available` is recomputed. 409 if it would drop below the copies on loan, or if the new ISBN belongs to another book.",
         "tags": [
           "Books"
         ],
@@ -155,7 +187,7 @@
       },
       "delete": {
         "operationId": "app_presentation_api_delete_book",
-        "summary": "Remove a book (stub)",
+        "summary": "Delete a book",
         "parameters": [
           {
             "in": "path",
@@ -170,8 +202,29 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
+        "description": "409 if the book has any bookings (including cancelled ones).",
         "tags": [
           "Books"
         ]
@@ -213,6 +266,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Reader"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -286,7 +349,7 @@
       },
       "patch": {
         "operationId": "app_presentation_api_patch_reader",
-        "summary": "Update a reader (stub)",
+        "summary": "Update a reader",
         "parameters": [
           {
             "in": "path",
@@ -308,6 +371,36 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -326,7 +419,7 @@
       },
       "delete": {
         "operationId": "app_presentation_api_delete_reader",
-        "summary": "Remove a reader (stub)",
+        "summary": "Delete a reader",
         "parameters": [
           {
             "in": "path",
@@ -341,8 +434,29 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
+        "description": "409 if the reader has any bookings (including cancelled ones).",
         "tags": [
           "Readers"
         ]
@@ -407,8 +521,19 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
+        "description": "Takes one copy of the book. 409 if no copies are available.",
         "tags": [
           "Bookings"
         ],
@@ -467,7 +592,7 @@
       },
       "patch": {
         "operationId": "app_presentation_api_patch_booking",
-        "summary": "Update a booking (stub)",
+        "summary": "Update a booking",
         "parameters": [
           {
             "in": "path",
@@ -489,8 +614,39 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
+        "description": "Only active bookings can be changed (409 otherwise). Moving a booking to another book returns the old copy and takes one from the new book (409 if none is available).",
         "tags": [
           "Bookings"
         ],
@@ -507,7 +663,7 @@
       },
       "delete": {
         "operationId": "app_presentation_api_delete_booking",
-        "summary": "Remove (cancel) a booking (stub)",
+        "summary": "Cancel a booking",
         "parameters": [
           {
             "in": "path",
@@ -522,8 +678,29 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
+        "description": "Soft delete: status becomes `cancelled` and the copy becomes available again. Repeating the call is harmless. 409 for a returned booking.",
         "tags": [
           "Bookings"
         ]
@@ -533,6 +710,7 @@
   "components": {
     "schemas": {
       "Book": {
+        "description": "A stored book. Copy-count rules live here, so every use case shares them.\n\nThe methods never mutate: they return a changed copy (the caller then saves it).",
         "properties": {
           "title": {
             "title": "Title",
@@ -586,16 +764,23 @@
         "type": "object"
       },
       "CreateBookInput": {
+        "description": "Register copies of a book.\n\nIf a book with the same ISBN, title and author already exists, ``copies_total``\nis the number of copies ADDED to it (and to its available copies).",
         "properties": {
           "title": {
+            "maxLength": 255,
+            "minLength": 1,
             "title": "Title",
             "type": "string"
           },
           "author": {
+            "maxLength": 255,
+            "minLength": 1,
             "title": "Author",
             "type": "string"
           },
           "isbn": {
+            "maxLength": 32,
+            "minLength": 1,
             "title": "Isbn",
             "type": "string"
           },
@@ -615,11 +800,13 @@
         "type": "object"
       },
       "UpdateBookInput": {
-        "description": "All fields optional: PATCH only changes what the client sends.",
+        "description": "All fields optional: PATCH only changes what the client sends.\n\n``copies_total`` is the NEW total stock (not an increment). Copies currently on\nloan stay on loan, so ``copies_available`` is recomputed.",
         "properties": {
           "title": {
             "anyOf": [
               {
+                "maxLength": 255,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -631,6 +818,8 @@
           "author": {
             "anyOf": [
               {
+                "maxLength": 255,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -642,6 +831,8 @@
           "isbn": {
             "anyOf": [
               {
+                "maxLength": 32,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -692,10 +883,13 @@
       "CreateReaderInput": {
         "properties": {
           "full_name": {
+            "maxLength": 255,
+            "minLength": 1,
             "title": "Full Name",
             "type": "string"
           },
           "email": {
+            "maxLength": 254,
             "title": "Email",
             "type": "string"
           }
@@ -725,6 +919,8 @@
           "full_name": {
             "anyOf": [
               {
+                "maxLength": 255,
+                "minLength": 1,
                 "type": "string"
               },
               {
@@ -736,6 +932,7 @@
           "email": {
             "anyOf": [
               {
+                "maxLength": 254,
                 "type": "string"
               },
               {
