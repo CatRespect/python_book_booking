@@ -1,4 +1,5 @@
 """Django ORM models = database tables. NOT the domain entities (see domain/entities.py)."""
+
 from django.db import models
 from django.db.models import F, Q
 
@@ -33,8 +34,12 @@ class ReaderModel(models.Model):
 class BookingModel(models.Model):
     # PROTECT: deleting a book/reader that still has bookings is refused
     # (by Django, and ultimately by the foreign key in PostgreSQL).
-    book = models.ForeignKey(BookModel, on_delete=models.PROTECT, related_name="bookings")
-    reader = models.ForeignKey(ReaderModel, on_delete=models.PROTECT, related_name="bookings")
+    book = models.ForeignKey(
+        BookModel, on_delete=models.PROTECT, related_name="bookings"
+    )
+    reader = models.ForeignKey(
+        ReaderModel, on_delete=models.PROTECT, related_name="bookings"
+    )
     start_date = models.DateField()
     end_date = models.DateField()
     status = models.CharField(

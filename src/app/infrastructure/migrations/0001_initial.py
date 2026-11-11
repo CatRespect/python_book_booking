@@ -8,49 +8,109 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
-            name='ReaderModel',
+            name="ReaderModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('full_name', models.CharField(max_length=255)),
-                ('email', models.EmailField(max_length=254, unique=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("full_name", models.CharField(max_length=255)),
+                ("email", models.EmailField(max_length=254, unique=True)),
             ],
             options={
-                'db_table': 'readers',
+                "db_table": "readers",
             },
         ),
         migrations.CreateModel(
-            name='BookModel',
+            name="BookModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('title', models.CharField(max_length=255)),
-                ('author', models.CharField(max_length=255)),
-                ('isbn', models.CharField(max_length=32, unique=True)),
-                ('copies_total', models.PositiveIntegerField()),
-                ('copies_available', models.PositiveIntegerField()),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("title", models.CharField(max_length=255)),
+                ("author", models.CharField(max_length=255)),
+                ("isbn", models.CharField(max_length=32, unique=True)),
+                ("copies_total", models.PositiveIntegerField()),
+                ("copies_available", models.PositiveIntegerField()),
             ],
             options={
-                'db_table': 'books',
-                'constraints': [models.CheckConstraint(condition=models.Q(('copies_available__lte', models.F('copies_total'))), name='books_copies_available_lte_total')],
+                "db_table": "books",
+                "constraints": [
+                    models.CheckConstraint(
+                        condition=models.Q(
+                            ("copies_available__lte", models.F("copies_total"))
+                        ),
+                        name="books_copies_available_lte_total",
+                    )
+                ],
             },
         ),
         migrations.CreateModel(
-            name='BookingModel',
+            name="BookingModel",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('start_date', models.DateField()),
-                ('end_date', models.DateField()),
-                ('status', models.CharField(choices=[('active', 'Active'), ('returned', 'Returned'), ('cancelled', 'Cancelled')], default='active', max_length=16)),
-                ('book', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='bookings', to='booking.bookmodel')),
-                ('reader', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='bookings', to='booking.readermodel')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("start_date", models.DateField()),
+                ("end_date", models.DateField()),
+                (
+                    "status",
+                    models.CharField(
+                        choices=[
+                            ("active", "Active"),
+                            ("returned", "Returned"),
+                            ("cancelled", "Cancelled"),
+                        ],
+                        default="active",
+                        max_length=16,
+                    ),
+                ),
+                (
+                    "book",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="bookings",
+                        to="booking.bookmodel",
+                    ),
+                ),
+                (
+                    "reader",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="bookings",
+                        to="booking.readermodel",
+                    ),
+                ),
             ],
             options={
-                'db_table': 'bookings',
-                'constraints': [models.CheckConstraint(condition=models.Q(('end_date__gte', models.F('start_date'))), name='bookings_end_not_before_start')],
+                "db_table": "bookings",
+                "constraints": [
+                    models.CheckConstraint(
+                        condition=models.Q(("end_date__gte", models.F("start_date"))),
+                        name="bookings_end_not_before_start",
+                    )
+                ],
             },
         ),
     ]
