@@ -47,13 +47,14 @@ def _book(isbn="111"):
     return CreateBookInput(title="T", author="A", isbn=isbn, copies_total=3)
 
 
-def test_create_book_starts_with_all_copies_available(repos):
+def test_create_book_starts_with_all_copies_available(repos) -> None:
     books, _, _, uow = repos
     book = use_cases.create_book(books, uow, _book()).book
-    assert book.id == 1 and book.copies_available == 3
+    assert book.id == 1
+    assert book.copies_available == 3
 
 
-def test_duplicate_isbn_rejected(repos):
+def test_duplicate_isbn_rejected(repos) -> None:
     books, _, _, uow = repos
     use_cases.create_book(books, uow, _book())
     with pytest.raises(IsbnBelongsToAnotherBook):
@@ -64,8 +65,8 @@ def test_duplicate_isbn_rejected(repos):
         )
 
 
-def test_get_missing_entities_raise_not_found(repos):
-    books, readers, bookings, uow = repos
+def test_get_missing_entities_raise_not_found(repos) -> None:
+    books, readers, bookings, _uow = repos
     with pytest.raises(BookNotFound):
         use_cases.get_book(books, 1)
     with pytest.raises(ReaderNotFound):
@@ -74,7 +75,7 @@ def test_get_missing_entities_raise_not_found(repos):
         use_cases.get_booking(bookings, 1)
 
 
-def test_reader_roundtrip_and_duplicate_email(repos):
+def test_reader_roundtrip_and_duplicate_email(repos) -> None:
     _, readers, _, _ = repos
     data = CreateReaderInput(full_name="Jane", email="j@x.com")
     use_cases.create_reader(readers, data)
@@ -84,13 +85,13 @@ def test_reader_roundtrip_and_duplicate_email(repos):
 
 
 def _booking_input(**kw):
-    base = dict(
-        book_id=1, reader_id=1, start_date=date(2026, 1, 1), end_date=date(2026, 1, 5)
-    )
+    base = {
+        "book_id": 1, "reader_id": 1, "start_date": date(2026, 1, 1), "end_date": date(2026, 1, 5)
+    }
     return CreateBookingInput(**{**base, **kw})
 
 
-def test_create_booking_happy_path(repos):
+def test_create_booking_happy_path(repos) -> None:
     books, readers, bookings, uow = repos
     use_cases.create_book(books, uow, _book())
     use_cases.create_reader(readers, CreateReaderInput(full_name="J", email="j@x.com"))
@@ -99,7 +100,7 @@ def test_create_booking_happy_path(repos):
     assert use_cases.get_booking(bookings, booking.id).book_id == 1
 
 
-def test_create_booking_rejects_bad_period(repos):
+def test_create_booking_rejects_bad_period(repos) -> None:
     books, readers, bookings, uow = repos
     with pytest.raises(InvalidBookingPeriod):
         use_cases.create_booking(
@@ -107,7 +108,7 @@ def test_create_booking_rejects_bad_period(repos):
         )
 
 
-def test_create_booking_requires_existing_book_and_reader(repos):
+def test_create_booking_requires_existing_book_and_reader(repos) -> None:
     books, readers, bookings, uow = repos
     with pytest.raises(BookNotFound):
         use_cases.create_booking(bookings, books, readers, uow, _booking_input())
@@ -117,8 +118,8 @@ def test_create_booking_requires_existing_book_and_reader(repos):
 
 
 # ------------------------------------------------ availability / copies
-def _setup(repos, total=1):
-    books, readers, bookings, uow = repos
+def _setup(repos, total=1) -> None:
+    books, readers, _bookings, uow = repos
     use_cases.create_book(
         books,
         uow,
@@ -127,7 +128,7 @@ def _setup(repos, total=1):
     use_cases.create_reader(readers, CreateReaderInput(full_name="J", email="j@x.com"))
 
 
-def test_booking_takes_a_copy_and_fails_at_zero(repos):
+def test_booking_takes_a_copy_and_fails_at_zero(repos) -> None:
     books, readers, bookings, uow = repos
     _setup(repos, total=1)
     use_cases.create_booking(bookings, books, readers, uow, _booking_input())
@@ -137,17 +138,18 @@ def test_booking_takes_a_copy_and_fails_at_zero(repos):
     assert len(bookings.items) == 1
 
 
-def test_same_isbn_title_author_adds_copies(repos):
+def test_same_isbn_title_author_adds_copies(repos) -> None:
     books, _, _, uow = repos
     first = use_cases.create_book(books, uow, _book())
     again = use_cases.create_book(
         books, uow, CreateBookInput(title=" t ", author="a", isbn="111", copies_total=2)
     )
-    assert first.created and not again.created
+    assert first.created
+    assert not again.created
     assert (again.book.copies_total, again.book.copies_available) == (5, 5)
 
 
-def test_same_isbn_other_title_is_conflict(repos):
+def test_same_isbn_other_title_is_conflict(repos) -> None:
     books, _, _, uow = repos
     use_cases.create_book(books, uow, _book())
     with pytest.raises(IsbnBelongsToAnotherBook):
@@ -158,7 +160,7 @@ def test_same_isbn_other_title_is_conflict(repos):
         )
 
 
-def test_cancel_returns_copy_and_is_idempotent(repos):
+def test_cancel_returns_copy_and_is_idempotent(repos) -> None:
     books, readers, bookings, uow = repos
     _setup(repos)
     use_cases.create_booking(bookings, books, readers, uow, _booking_input())
@@ -168,7 +170,7 @@ def test_cancel_returns_copy_and_is_idempotent(repos):
     assert bookings.get(1).status == BookingStatus.CANCELLED
 
 
-def test_move_booking_to_other_book_moves_the_copy(repos):
+def test_move_booking_to_other_book_moves_the_copy(repos) -> None:
     books, readers, bookings, uow = repos
     _setup(repos)
     use_cases.create_book(
@@ -181,7 +183,7 @@ def test_move_booking_to_other_book_moves_the_copy(repos):
     assert (books.get(1).copies_available, books.get(2).copies_available) == (1, 0)
 
 
-def test_update_and_delete_rules(repos):
+def test_update_and_delete_rules(repos) -> None:
     books, readers, bookings, uow = repos
     _setup(repos, total=2)
     use_cases.create_booking(bookings, books, readers, uow, _booking_input())

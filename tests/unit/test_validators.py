@@ -15,7 +15,7 @@ from app.domain.validators import is_valid_email, normalize_email, normalize_tex
         "1234@5678.com",
     ],
 )
-def test_valid_emails(email):
+def test_valid_emails(email) -> None:
     assert is_valid_email(email)
 
 
@@ -45,20 +45,20 @@ def test_valid_emails(email):
         "a@" + "b" * 250 + ".com",  # total length too long
     ],
 )
-def test_invalid_emails(email):
+def test_invalid_emails(email) -> None:
     assert not is_valid_email(email)
 
 
-def test_normalize_email_trims_and_lowercases():
+def test_normalize_email_trims_and_lowercases() -> None:
     assert normalize_email("  Jane@Example.COM ") == "jane@example.com"
 
 
-def test_regex_is_not_catastrophic_on_hostile_input():
+def test_regex_is_not_catastrophic_on_hostile_input() -> None:
     # A backtracking-prone regex would hang here; ours answers immediately.
     assert not is_valid_email("a" * 60 + "@" + ("a-" * 100) + "!")
 
 
-def test_normalize_text_ignores_case_and_spacing():
+def test_normalize_text_ignores_case_and_spacing() -> None:
     assert normalize_text("  Clean   Architecture ") == normalize_text(
         "clean architecture"
     )

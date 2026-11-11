@@ -194,7 +194,7 @@ def create_booking(
 ) -> Booking:
     """Book one copy: checks the rules, takes a copy, stores the booking - atomically."""
     if data.end_date < data.start_date:
-        raise InvalidBookingPeriod()
+        raise InvalidBookingPeriod
     with uow.atomic():
         book = books.get_for_update(data.book_id)
         if book is None:
@@ -228,7 +228,7 @@ def update_booking(
 
         updated = booking.model_copy(update=changes)
         if updated.end_date < updated.start_date:
-            raise InvalidBookingPeriod()
+            raise InvalidBookingPeriod
         if (
             updated.reader_id != booking.reader_id
             and readers.get(updated.reader_id) is None

@@ -21,7 +21,7 @@ from app.domain.repositories import (
 
 
 class FakeBookRepository(BookRepository):
-    def __init__(self):
+    def __init__(self) -> None:
         self.items: dict[int, Book] = {}
         self._next_id = 1
 
@@ -53,13 +53,13 @@ class FakeBookRepository(BookRepository):
         self.items[book.id] = book
         return book
 
-    def delete(self, book_id):
+    def delete(self, book_id) -> None:
         if self.items.pop(book_id, None) is None:
             raise BookNotFound(book_id)
 
 
 class FakeReaderRepository(ReaderRepository):
-    def __init__(self):
+    def __init__(self) -> None:
         self.items: dict[int, Reader] = {}
         self._next_id = 1
 
@@ -87,13 +87,13 @@ class FakeReaderRepository(ReaderRepository):
         self.items[reader.id] = reader
         return reader
 
-    def delete(self, reader_id):
+    def delete(self, reader_id) -> None:
         if self.items.pop(reader_id, None) is None:
             raise ReaderNotFound(reader_id)
 
 
 class FakeBookingRepository(BookingRepository):
-    def __init__(self):
+    def __init__(self) -> None:
         self.items: dict[int, Booking] = {}
         self._next_id = 1
 
@@ -130,7 +130,7 @@ class FakeUnitOfWork(UnitOfWork):
     back to its state at entry. This lets tests prove "nothing is written on failure".
     """
 
-    def __init__(self, *repos):
+    def __init__(self, *repos) -> None:
         self._repos = repos
 
     def atomic(self) -> AbstractContextManager[None]:
