@@ -939,6 +939,25 @@ pytest = ">=7"
 testing = ["process-tests", "pytest-xdist", "virtualenv"]
 
 [[package]]
+name = "pytest-django"
+version = "4.14.0"
+description = "A Django plugin for pytest."
+optional = false
+python-versions = ">=3.10"
+groups = ["dev"]
+files = [
+    {file = "pytest_django-4.14.0-py3-none-any.whl", hash = "sha256:c533b08d89cc675efcd5398eea270b34547e35f9a3608e2c9748dd88428ea187"},
+    {file = "pytest_django-4.14.0.tar.gz", hash = "sha256:26787dd3f422cfbab8f55b80a776e2edea7a11092cb74e960bef1312515708ef"},
+]
+
+[package.dependencies]
+pytest = ">=7.0.0"
+
+[package.extras]
+django = ["django (>=5.2)"]
+docs = ["sphinx", "sphinx-rtd-theme"]
+
+[[package]]
 name = "pytokens"
 version = "0.4.1"
 description = "A Fast, spec compliant Python 3.14+ tokenizer that runs on older Pythons."
@@ -1093,4 +1112,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.14"
-content-hash = "c36de87f80a1bcbac33030464a0a27d4d09ea4a48782c0fba219a7756e121664"
+content-hash = "40dbde962d6ab7f109c5b35af285f347d47b0fa808e9343c4b488925a9968dec"
