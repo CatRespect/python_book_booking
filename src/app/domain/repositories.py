@@ -1,7 +1,10 @@
-"""Ports: abstract storage interfaces. Implemented later in infrastructure/."""
+"""Ports: abstract storage interfaces. Implemented in infrastructure/repositories.py.
+
+Update/delete methods will be added here when those operations get implemented.
+"""
 from abc import ABC, abstractmethod
 
-from app.domain.entities import Book, Booking, Reader
+from app.domain.entities import Book, Booking, NewBook, NewBooking, NewReader, Reader
 
 
 class BookRepository(ABC):
@@ -12,7 +15,8 @@ class BookRepository(ABC):
     def get(self, book_id: int) -> Book | None: ...
 
     @abstractmethod
-    def add(self, book: Book) -> Book: ...
+    def add(self, new_book: NewBook) -> Book:
+        """Store and return the book. Raises BookAlreadyExists on duplicate ISBN."""
 
 
 class ReaderRepository(ABC):
@@ -20,7 +24,11 @@ class ReaderRepository(ABC):
     def list(self) -> list[Reader]: ...
 
     @abstractmethod
-    def add(self, reader: Reader) -> Reader: ...
+    def get(self, reader_id: int) -> Reader | None: ...
+
+    @abstractmethod
+    def add(self, new_reader: NewReader) -> Reader:
+        """Store and return the reader. Raises ReaderAlreadyExists on duplicate email."""
 
 
 class BookingRepository(ABC):
@@ -31,4 +39,4 @@ class BookingRepository(ABC):
     def get(self, booking_id: int) -> Booking | None: ...
 
     @abstractmethod
-    def add(self, booking: Booking) -> Booking: ...
+    def add(self, new_booking: NewBooking) -> Booking: ...

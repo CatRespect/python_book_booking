@@ -15,6 +15,12 @@ db-up:
 db-down:
 	docker compose down
 
+migrations:
+	python src/manage.py makemigrations booking
+
+migrate:
+	python src/manage.py migrate
+
 run:
 	python src/manage.py runserver
 

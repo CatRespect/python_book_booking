@@ -10,6 +10,7 @@ ALLOWED_HOSTS = ["*"]  # prototype only: restrict in production
 INSTALLED_APPS = [
     "django.contrib.staticfiles",  # serves Swagger UI assets in dev
     "ninja",
+    "app.infrastructure.apps.InfrastructureConfig",  # ORM models + migrations
 ]
 
 MIDDLEWARE = [
@@ -37,6 +38,8 @@ DATABASES = {
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "change_me"),
         "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        "CONN_MAX_AGE": 60,  # reuse connections instead of reconnecting per request
+        "CONN_HEALTH_CHECKS": True,  # drop a stale reused connection instead of failing
     }
 }
 

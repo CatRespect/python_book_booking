@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Book Booking API",
-    "version": "0.1.0",
-    "description": "Prototype: endpoints return stub data, no business logic yet."
+    "version": "0.2.0",
+    "description": "List / get / create are backed by PostgreSQL. PATCH and DELETE are still stubs returning sample data."
   },
   "paths": {
     "/api/books": {
@@ -42,6 +42,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -87,6 +97,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -95,7 +115,7 @@
       },
       "patch": {
         "operationId": "app_presentation_api_patch_book",
-        "summary": "Update a book",
+        "summary": "Update a book (stub)",
         "parameters": [
           {
             "in": "path",
@@ -135,7 +155,7 @@
       },
       "delete": {
         "operationId": "app_presentation_api_delete_book",
-        "summary": "Remove a book",
+        "summary": "Remove a book (stub)",
         "parameters": [
           {
             "in": "path",
@@ -196,6 +216,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -238,6 +268,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -246,7 +286,7 @@
       },
       "patch": {
         "operationId": "app_presentation_api_patch_reader",
-        "summary": "Update a reader",
+        "summary": "Update a reader (stub)",
         "parameters": [
           {
             "in": "path",
@@ -286,7 +326,7 @@
       },
       "delete": {
         "operationId": "app_presentation_api_delete_reader",
-        "summary": "Remove a reader",
+        "summary": "Remove a reader (stub)",
         "parameters": [
           {
             "in": "path",
@@ -347,6 +387,26 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -389,6 +449,16 @@
                 }
               }
             }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         },
         "tags": [
@@ -397,7 +467,7 @@
       },
       "patch": {
         "operationId": "app_presentation_api_patch_booking",
-        "summary": "Update a booking",
+        "summary": "Update a booking (stub)",
         "parameters": [
           {
             "in": "path",
@@ -437,7 +507,7 @@
       },
       "delete": {
         "operationId": "app_presentation_api_delete_booking",
-        "summary": "Remove (cancel) a booking",
+        "summary": "Remove (cancel) a booking (stub)",
         "parameters": [
           {
             "in": "path",
@@ -464,10 +534,6 @@
     "schemas": {
       "Book": {
         "properties": {
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -489,17 +555,34 @@
             "minimum": 0,
             "title": "Copies Available",
             "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
           }
         },
         "required": [
-          "id",
           "title",
           "author",
           "isbn",
           "copies_total",
-          "copies_available"
+          "copies_available",
+          "id"
         ],
         "title": "Book",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "ErrorResponse",
         "type": "object"
       },
       "CreateBookInput": {
@@ -585,10 +668,6 @@
       },
       "Reader": {
         "properties": {
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
           "full_name": {
             "title": "Full Name",
             "type": "string"
@@ -596,12 +675,16 @@
           "email": {
             "title": "Email",
             "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
           }
         },
         "required": [
-          "id",
           "full_name",
-          "email"
+          "email",
+          "id"
         ],
         "title": "Reader",
         "type": "object"
@@ -667,10 +750,6 @@
       },
       "Booking": {
         "properties": {
-          "id": {
-            "title": "Id",
-            "type": "integer"
-          },
           "book_id": {
             "title": "Book Id",
             "type": "integer"
@@ -696,14 +775,18 @@
               }
             ],
             "default": "active"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
           }
         },
         "required": [
-          "id",
           "book_id",
           "reader_id",
           "start_date",
-          "end_date"
+          "end_date",
+          "id"
         ],
         "title": "Booking",
         "type": "object"

@@ -1,6 +1,8 @@
-"""Use cases. STUBS: no logic yet, they return sample data.
+"""Use cases.
 
-Later: accept repositories (from app.domain.repositories) and implement the real flow.
+IMPLEMENTED (take repositories as the first arguments): list/get/create for books,
+readers and bookings.
+STUBS (bottom of file): update_* / remove_* still return sample data.
 """
 from datetime import date
 
@@ -14,8 +16,84 @@ from app.application.dto import (
     UpdateBookInput,
     UpdateReaderInput,
 )
-from app.domain.entities import Book, Booking, Reader
+from app.domain.entities import (
+    Book,
+    Booking,
+    NewBook,
+    NewBooking,
+    NewReader,
+    Reader,
+)
+from app.domain.exceptions import (
+    BookingNotFound,
+    BookNotFound,
+    InvalidBookingPeriod,
+    ReaderNotFound,
+)
+from app.domain.repositories import BookingRepository, BookRepository, ReaderRepository
 
+
+# ---------------------------------------------------------------- books
+def list_books(books: BookRepository) -> list[Book]:
+    return books.list()
+
+
+def get_book(books: BookRepository, book_id: int) -> Book:
+    book = books.get(book_id)
+    if book is None:
+        raise BookNotFound(book_id)
+    return book
+
+
+def create_book(books: BookRepository, data: CreateBookInput) -> Book:
+    # A new title starts with every copy available.
+    return books.add(NewBook(**data.model_dump(), copies_available=data.copies_total))
+
+
+# -------------------------------------------------------------- readers
+def list_readers(readers: ReaderRepository) -> list[Reader]:
+    return readers.list()
+
+
+def get_reader(readers: ReaderRepository, reader_id: int) -> ReaderNameOutput:
+    reader = readers.get(reader_id)
+    if reader is None:
+        raise ReaderNotFound(reader_id)
+    return ReaderNameOutput(full_name=reader.full_name)
+
+
+def create_reader(readers: ReaderRepository, data: CreateReaderInput) -> Reader:
+    return readers.add(NewReader(**data.model_dump()))
+
+
+# ------------------------------------------------------------- bookings
+def list_bookings(bookings: BookingRepository) -> list[Booking]:
+    return bookings.list()
+
+
+def get_booking(bookings: BookingRepository, booking_id: int) -> BookingDetailsOutput:
+    booking = bookings.get(booking_id)
+    if booking is None:
+        raise BookingNotFound(booking_id)
+    return BookingDetailsOutput(**booking.model_dump(exclude={"id"}))
+
+
+def create_booking(
+    bookings: BookingRepository,
+    books: BookRepository,
+    readers: ReaderRepository,
+    data: CreateBookingInput,
+) -> Booking:
+    if data.end_date < data.start_date:
+        raise InvalidBookingPeriod()
+    if books.get(data.book_id) is None:
+        raise BookNotFound(data.book_id)
+    if readers.get(data.reader_id) is None:
+        raise ReaderNotFound(data.reader_id)
+    return bookings.add(NewBooking(**data.model_dump()))
+
+
+# ======================================================== STUBS (no logic yet)
 _SAMPLE_BOOK = Book(
     id=1,
     title="Clean Architecture",
@@ -34,28 +112,13 @@ _SAMPLE_BOOKING = Booking(
 )
 
 
-def list_books() -> list[Book]:
-    return [_SAMPLE_BOOK]
+def update_book(book_id: int, data: UpdateBookInput) -> Book:
+    changes = data.model_dump(exclude_unset=True)
+    return _SAMPLE_BOOK.model_copy(update={"id": book_id, **changes})
 
 
-def get_book(book_id: int) -> Book:
-    return _SAMPLE_BOOK.model_copy(update={"id": book_id})
-
-
-def create_book(data: CreateBookInput) -> Book:
-    return Book(id=1, copies_available=data.copies_total, **data.model_dump())
-
-
-def list_readers() -> list[Reader]:
-    return [_SAMPLE_READER]
-
-
-def get_reader(reader_id: int) -> ReaderNameOutput:
-    return ReaderNameOutput(full_name=_SAMPLE_READER.full_name)
-
-
-def create_reader(data: CreateReaderInput) -> Reader:
-    return Reader(id=1, **data.model_dump())
+def remove_book(book_id: int) -> None:
+    return None
 
 
 def update_reader(reader_id: int, data: UpdateReaderInput) -> Reader:
@@ -64,28 +127,6 @@ def update_reader(reader_id: int, data: UpdateReaderInput) -> Reader:
 
 
 def remove_reader(reader_id: int) -> None:
-    return None
-
-
-def list_bookings() -> list[Booking]:
-    return [_SAMPLE_BOOKING]
-
-
-def get_booking(booking_id: int) -> BookingDetailsOutput:
-    return BookingDetailsOutput(**_SAMPLE_BOOKING.model_dump(exclude={"id"}))
-
-
-def create_booking(data: CreateBookingInput) -> Booking:
-    return Booking(id=1, **data.model_dump())
-
-
-
-def update_book(book_id: int, data: UpdateBookInput) -> Book:
-    changes = data.model_dump(exclude_unset=True)
-    return _SAMPLE_BOOK.model_copy(update={"id": book_id, **changes})
-
-
-def remove_book(book_id: int) -> None:
     return None
 
 

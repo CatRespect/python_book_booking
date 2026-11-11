@@ -10,8 +10,9 @@ class BookingStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
-class Book(BaseModel):
-    id: int
+# "New*" = data before it has been stored (no id yet).
+# The stored entity extends it with the database-assigned id.
+class NewBook(BaseModel):
     title: str
     author: str
     isbn: str
@@ -19,16 +20,26 @@ class Book(BaseModel):
     copies_available: int = Field(ge=0)
 
 
-class Reader(BaseModel):
+class Book(NewBook):
     id: int
+
+
+class NewReader(BaseModel):
     full_name: str
     email: str
 
 
-class Booking(BaseModel):
+class Reader(NewReader):
     id: int
+
+
+class NewBooking(BaseModel):
     book_id: int
     reader_id: int
     start_date: date
     end_date: date
     status: BookingStatus = BookingStatus.ACTIVE
+
+
+class Booking(NewBooking):
+    id: int
